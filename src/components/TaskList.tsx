@@ -20,6 +20,7 @@ type Task = {
   priority: string;
   status: string;
   tags: { id: string; name: string; color: string | null }[];
+  checklistItems: { id: string; isDone: boolean }[];
   _count: { prompts: number; logs: number };
 };
 type TaskSort = "order" | "updated" | "created";
@@ -141,92 +142,109 @@ export default function TaskList({
         </p>
       ) : (
         <ul className="space-y-1.5">
-          {tasks.map((t) => (
-            <li
-              key={t.id}
-              className="flex items-center gap-3 rounded-md border border-slate-800 px-3 py-2 hover:border-slate-700"
-            >
-              <form action={updateTaskStatus} className="shrink-0">
-                <input type="hidden" name="id" value={t.id} />
-                <select
-                  name="status"
-                  defaultValue={t.status}
-                  onChange={(e) => e.currentTarget.form?.requestSubmit()}
-                  className={`text-[11px] font-medium rounded px-1.5 py-1 border-0 cursor-pointer ${
-                    STATUS_META[t.status as TaskStatus]?.cls ?? ""
-                  }`}
-                >
-                  {TASK_STATUSES.map((s) => (
-                    <option
-                      key={s}
-                      value={s}
-                      className="bg-slate-900 text-slate-100"
-                    >
-                      {STATUS_META[s].label}
-                    </option>
-                  ))}
-                </select>
-              </form>
+          {tasks.map((t) => {
+            const checklistTotal = t.checklistItems.length;
+            const checklistDone = t.checklistItems.filter(
+              (item) => item.isDone
+            ).length;
+            const checklistPercent =
+              checklistTotal === 0
+                ? 0
+                : Math.round((checklistDone / checklistTotal) * 100);
 
-              <Link
-                href={`/tasks/${t.id}`}
-                className="flex-1 min-w-0 hover:text-indigo-300"
+            return (
+              <li
+                key={t.id}
+                className="flex items-center gap-3 rounded-md border border-slate-800 px-3 py-2 hover:border-slate-700"
               >
-                <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                  <span
-                    className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded ${
-                      PRIORITY_META[t.priority as TaskPriority]?.cls ??
-                      PRIORITY_META.MEDIUM.cls
+                <form action={updateTaskStatus} className="shrink-0">
+                  <input type="hidden" name="id" value={t.id} />
+                  <select
+                    name="status"
+                    defaultValue={t.status}
+                    onChange={(e) => e.currentTarget.form?.requestSubmit()}
+                    className={`text-[11px] font-medium rounded px-1.5 py-1 border-0 cursor-pointer ${
+                      STATUS_META[t.status as TaskStatus]?.cls ?? ""
                     }`}
                   >
-                    {PRIORITY_META[t.priority as TaskPriority]?.label ??
-                      t.priority}
-                  </span>
-                  <div className="text-sm truncate">{t.title}</div>
-                  {t.isPinned && (
-                    <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-amber-600/80 text-amber-50">
-                      고정
-                    </span>
-                  )}
-                </div>
-                {t.description && (
-                  <div className="text-xs text-slate-500 truncate mt-0.5">
-                    {t.description}
-                  </div>
-                )}
-                {t.tags.length > 0 && (
-                  <div className="flex gap-1 mt-1 flex-wrap">
-                    {t.tags.map((tag) => (
-                      <span
-                        key={tag.id}
-                        className="text-[10px] px-1.5 py-0.5 rounded-full border border-slate-700 text-slate-300"
-                        style={
-                          tag.color
-                            ? { borderColor: tag.color, color: tag.color }
-                            : undefined
-                        }
+                    {TASK_STATUSES.map((s) => (
+                      <option
+                        key={s}
+                        value={s}
+                        className="bg-slate-900 text-slate-100"
                       >
-                        #{tag.name}
-                      </span>
+                        {STATUS_META[s].label}
+                      </option>
                     ))}
-                  </div>
-                )}
-              </Link>
+                  </select>
+                </form>
 
-              <span className="text-[11px] text-slate-500 shrink-0">
-                프롬프트 {t._count.prompts} · 로그 {t._count.logs}
-              </span>
-              <form action={toggleTaskPin} className="shrink-0">
-                <input type="hidden" name="id" value={t.id} />
-                <button
-                  className="text-xs px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 text-slate-300"
-                  title={t.isPinned ? "핀 해제" : "핀 고정"}
+                <Link
+                  href={`/tasks/${t.id}`}
+                  className="flex-1 min-w-0 hover:text-indigo-300"
                 >
-                  {t.isPinned ? "해제" : "고정"}
-                </button>
-              </form>
-            </li>
-          ))}
+                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                    <span
+                      className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded ${
+                        PRIORITY_META[t.priority as TaskPriority]?.cls ??
+                        PRIORITY_META.MEDIUM.cls
+                      }`}
+                    >
+                      {PRIORITY_META[t.priority as TaskPriority]?.label ??
+                        t.priority}
+                    </span>
+                    <div className="text-sm truncate">{t.title}</div>
+                    {t.isPinned && (
+                      <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-amber-600/80 text-amber-50">
+                        고정
+                      </span>
+                    )}
+                  </div>
+                  {t.description && (
+                    <div className="text-xs text-slate-500 truncate mt-0.5">
+                      {t.description}
+                    </div>
+                  )}
+                  {t.tags.length > 0 && (
+                    <div className="flex gap-1 mt-1 flex-wrap">
+                      {t.tags.map((tag) => (
+                        <span
+                          key={tag.id}
+                          className="text-[10px] px-1.5 py-0.5 rounded-full border border-slate-700 text-slate-300"
+                          style={
+                            tag.color
+                              ? { borderColor: tag.color, color: tag.color }
+                              : undefined
+                          }
+                        >
+                          #{tag.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {checklistTotal > 0 && (
+                    <div className="text-[11px] text-slate-500 mt-1">
+                      체크리스트 {checklistDone}/{checklistTotal} done ·{" "}
+                      {checklistPercent}%
+                    </div>
+                  )}
+                </Link>
+
+                <span className="text-[11px] text-slate-500 shrink-0">
+                  프롬프트 {t._count.prompts} · 로그 {t._count.logs}
+                </span>
+                <form action={toggleTaskPin} className="shrink-0">
+                  <input type="hidden" name="id" value={t.id} />
+                  <button
+                    className="text-xs px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 text-slate-300"
+                    title={t.isPinned ? "핀 해제" : "핀 고정"}
+                  >
+                    {t.isPinned ? "해제" : "고정"}
+                  </button>
+                </form>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

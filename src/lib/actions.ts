@@ -41,6 +41,12 @@ function booleanField(value: unknown): boolean {
   return typeof value === "boolean" ? value : false;
 }
 
+function integerField(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isInteger(value)
+    ? value
+    : fallback;
+}
+
 function arrayField(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value) ? value.filter(isRecord) : [];
 }
@@ -117,6 +123,17 @@ function revalidateGitCommitPaths({
 function revalidatePinnedPaths() {
   revalidatePath("/");
   revalidatePath("/search");
+}
+
+function revalidateTaskPaths({
+  projectId,
+  taskId,
+}: {
+  projectId: string;
+  taskId: string;
+}) {
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/tasks/${taskId}`);
 }
 
 /* ---------- Project ---------- */
@@ -268,6 +285,25 @@ export async function importProjectFromJson(formData: FormData) {
               color: nullableStringField(tag.color),
               createdAt: dateField(tag.createdAt),
               updatedAt: dateField(tag.updatedAt),
+            },
+          });
+        }
+
+        const checklistItems = arrayField(task.checklistItems);
+        const checklistFallback = arrayField(task.checklist);
+        const importedChecklistItems =
+          checklistItems.length > 0 ? checklistItems : checklistFallback;
+        for (const item of importedChecklistItems) {
+          const content = stringField(item.content);
+          if (!content) continue;
+          await tx.taskChecklistItem.create({
+            data: {
+              taskId: createdTask.id,
+              content,
+              isDone: booleanField(item.isDone),
+              order: integerField(item.order),
+              createdAt: dateField(item.createdAt),
+              updatedAt: dateField(item.updatedAt),
             },
           });
         }
@@ -500,6 +536,83 @@ export async function deleteTaskTag(formData: FormData) {
   revalidatePath(`/projects/${task.projectId}`);
   revalidatePath(`/tasks/${taskId}`);
   revalidatePath("/search");
+}
+
+export async function createTaskChecklistItem(formData: FormData) {
+  const taskId = str(formData.get("taskId"));
+  const content = str(formData.get("content"));
+  if (!taskId || !content) return;
+
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { projectId: true },
+  });
+  if (!task) return;
+
+  const count = await prisma.taskChecklistItem.count({ where: { taskId } });
+  await prisma.taskChecklistItem.create({
+    data: { taskId, content, order: count },
+  });
+  revalidateTaskPaths({ projectId: task.projectId, taskId });
+}
+
+export async function toggleTaskChecklistItem(formData: FormData) {
+  const id = str(formData.get("id"));
+  if (!id) return;
+
+  const item = await prisma.taskChecklistItem.findUnique({
+    where: { id },
+    select: {
+      isDone: true,
+      taskId: true,
+      task: { select: { projectId: true } },
+    },
+  });
+  if (!item) return;
+
+  await prisma.taskChecklistItem.update({
+    where: { id },
+    data: { isDone: !item.isDone },
+  });
+  revalidateTaskPaths({ projectId: item.task.projectId, taskId: item.taskId });
+}
+
+export async function updateTaskChecklistItem(formData: FormData) {
+  const id = str(formData.get("id"));
+  const content = str(formData.get("content"));
+  if (!id || !content) return;
+
+  const item = await prisma.taskChecklistItem.findUnique({
+    where: { id },
+    select: {
+      taskId: true,
+      task: { select: { projectId: true } },
+    },
+  });
+  if (!item) return;
+
+  await prisma.taskChecklistItem.update({
+    where: { id },
+    data: { content },
+  });
+  revalidateTaskPaths({ projectId: item.task.projectId, taskId: item.taskId });
+}
+
+export async function deleteTaskChecklistItem(formData: FormData) {
+  const id = str(formData.get("id"));
+  if (!id) return;
+
+  const item = await prisma.taskChecklistItem.findUnique({
+    where: { id },
+    select: {
+      taskId: true,
+      task: { select: { projectId: true } },
+    },
+  });
+  if (!item) return;
+
+  await prisma.taskChecklistItem.delete({ where: { id } });
+  revalidateTaskPaths({ projectId: item.task.projectId, taskId: item.taskId });
 }
 
 export async function deleteTask(formData: FormData) {

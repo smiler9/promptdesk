@@ -98,6 +98,10 @@ export default async function ProjectPage({
                   : [{ isPinned: "desc" }, { order: "asc" }],
           include: {
             tags: { orderBy: { name: "asc" } },
+            checklistItems: {
+              orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+              select: { id: true, isDone: true },
+            },
             _count: { select: { prompts: true, logs: true } },
           },
         },
@@ -134,6 +138,18 @@ export default async function ProjectPage({
             id: true,
             name: true,
             color: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        checklistItems: {
+          orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+          select: {
+            id: true,
+            taskId: true,
+            content: true,
+            isDone: true,
+            order: true,
             createdAt: true,
             updatedAt: true,
           },

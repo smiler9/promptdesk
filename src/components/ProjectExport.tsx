@@ -53,6 +53,16 @@ type ExportTag = {
   updatedAt: Timestamp;
 };
 
+type ExportChecklistItem = {
+  id: string;
+  taskId: string;
+  content: string;
+  isDone: boolean;
+  order: number;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};
+
 type ExportReport = {
   id: string;
   taskId: string;
@@ -96,6 +106,7 @@ type ExportTask = {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   tags: ExportTag[];
+  checklistItems: ExportChecklistItem[];
   prompts: ExportPrompt[];
   logs: ExportLog[];
   reports: ExportReport[];
@@ -278,6 +289,11 @@ function buildJsonExport({
         createdAt: toIso(tag.createdAt),
         updatedAt: toIso(tag.updatedAt),
       })),
+      checklistItems: task.checklistItems.map((item) => ({
+        ...item,
+        createdAt: toIso(item.createdAt),
+        updatedAt: toIso(item.updatedAt),
+      })),
       logs: task.logs.map((log) => ({
         ...log,
         createdAt: toIso(log.createdAt),
@@ -366,6 +382,17 @@ function buildMarkdownExport({
         }`
       );
       lines.push(`- Description: ${task.description || "없음"}`);
+      lines.push("");
+
+      lines.push("#### Checklist");
+      lines.push("");
+      if (task.checklistItems.length === 0) {
+        lines.push("_체크리스트 항목이 없습니다._");
+      } else {
+        for (const item of task.checklistItems) {
+          lines.push(`- [${item.isDone ? "x" : " "}] ${item.content}`);
+        }
+      }
       lines.push("");
 
       lines.push("#### Prompts");

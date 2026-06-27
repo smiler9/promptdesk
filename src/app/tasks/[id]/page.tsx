@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import TaskHeader from "@/components/TaskHeader";
 import TaskWorkspace from "@/components/TaskWorkspace";
+import TaskChecklist from "@/components/TaskChecklist";
 import TaskExecutionReports from "@/components/TaskExecutionReports";
 import GitCommitRecords from "@/components/GitCommitRecords";
 
@@ -20,6 +21,9 @@ export default async function TaskPage({
       include: {
         project: { select: { id: true, name: true } },
         tags: { orderBy: { name: "asc" } },
+        checklistItems: {
+          orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+        },
         prompts: { orderBy: { createdAt: "desc" } },
         logs: { orderBy: { createdAt: "desc" } },
         reports: { orderBy: { createdAt: "desc" } },
@@ -63,6 +67,10 @@ export default async function TaskPage({
           priority={task.priority}
           tags={task.tags}
         />
+      </div>
+
+      <div className="mt-6">
+        <TaskChecklist taskId={task.id} items={task.checklistItems} />
       </div>
 
       <div className="mt-6">

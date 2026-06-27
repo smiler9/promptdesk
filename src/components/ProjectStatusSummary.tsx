@@ -27,6 +27,11 @@ type SummaryReport = {
   createdAt: Date;
 };
 
+type SummaryChecklistItem = {
+  id: string;
+  isDone: boolean;
+};
+
 type SummaryTask = {
   id: string;
   title: string;
@@ -38,6 +43,7 @@ type SummaryTask = {
   prompts: SummaryPrompt[];
   logs: SummaryLog[];
   reports: SummaryReport[];
+  checklistItems: SummaryChecklistItem[];
 };
 
 type SummaryGitCommit = {
@@ -95,6 +101,9 @@ function buildMarkdown({
   commitCount,
   pinnedTaskCount,
   priorityCounts,
+  checklistTotal,
+  checklistDone,
+  checklistOpen,
   recentTask,
   recentLog,
   recentReport,
@@ -115,6 +124,9 @@ function buildMarkdown({
   commitCount: number;
   pinnedTaskCount: number;
   priorityCounts: Record<TaskPriority, number>;
+  checklistTotal: number;
+  checklistDone: number;
+  checklistOpen: number;
   recentTask?: SummaryTask;
   recentLog?: RecentLog;
   recentReport?: RecentReport;
@@ -139,6 +151,9 @@ function buildMarkdown({
   lines.push(markdownLine("실행 리포트", reportCount));
   lines.push(markdownLine("Git 커밋 기록", commitCount));
   lines.push(markdownLine("고정 Task", pinnedTaskCount));
+  lines.push(markdownLine("체크리스트 전체", checklistTotal));
+  lines.push(markdownLine("체크리스트 완료", checklistDone));
+  lines.push(markdownLine("체크리스트 미완료", checklistOpen));
   for (const priority of TASK_PRIORITIES) {
     lines.push(markdownLine(priority, priorityCounts[priority]));
   }
@@ -258,6 +273,10 @@ export default function ProjectStatusSummary({
   const reportCount = reports.length;
   const commitCount = gitCommits.length;
   const pinnedTaskCount = tasks.filter((task) => task.isPinned).length;
+  const checklistItems = tasks.flatMap((task) => task.checklistItems);
+  const checklistTotal = checklistItems.length;
+  const checklistDone = checklistItems.filter((item) => item.isDone).length;
+  const checklistOpen = checklistTotal - checklistDone;
   const highUrgentTaskCount = priorityCounts.HIGH + priorityCounts.URGENT;
   const unpushedReportCount = reports.filter(
     (report) => !report.pushedToRemote
@@ -289,6 +308,9 @@ export default function ProjectStatusSummary({
     commitCount,
     pinnedTaskCount,
     priorityCounts,
+    checklistTotal,
+    checklistDone,
+    checklistOpen,
     recentTask,
     recentLog,
     recentReport,
@@ -309,6 +331,9 @@ export default function ProjectStatusSummary({
     { label: "Git 커밋", value: commitCount },
     { label: "고정 Task", value: pinnedTaskCount },
     { label: "HIGH/URGENT", value: highUrgentTaskCount },
+    { label: "체크리스트 전체", value: checklistTotal },
+    { label: "체크리스트 완료", value: checklistDone },
+    { label: "체크리스트 미완료", value: checklistOpen },
   ];
   const risks = [
     statusCounts.BLOCKED > 0
