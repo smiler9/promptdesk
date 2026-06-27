@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import TaskHeader from "@/components/TaskHeader";
 import TaskWorkspace from "@/components/TaskWorkspace";
 import TaskChecklist from "@/components/TaskChecklist";
+import NextAiPrompt from "@/components/NextAiPrompt";
 import TaskExecutionReports from "@/components/TaskExecutionReports";
 import GitCommitRecords from "@/components/GitCommitRecords";
 
@@ -71,6 +72,23 @@ export default async function TaskPage({
 
       <div className="mt-6">
         <TaskChecklist taskId={task.id} items={task.checklistItems} />
+      </div>
+
+      <div className="mt-6">
+        <NextAiPrompt
+          taskId={task.id}
+          projectName={task.project.name}
+          title={task.title}
+          description={task.description}
+          status={task.status}
+          priority={task.priority}
+          tags={task.tags}
+          prompts={task.prompts}
+          logs={task.logs}
+          reports={task.reports}
+          checklistItems={task.checklistItems}
+          gitCommits={task.gitCommits}
+        />
       </div>
 
       <div className="mt-6">

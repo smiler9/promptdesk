@@ -3,11 +3,7 @@
 import { useState, useMemo } from "react";
 import PromptCard from "./PromptCard";
 import LogCard from "./LogCard";
-import {
-  createPrompt,
-  createLog,
-  generateNextPrompt,
-} from "@/lib/actions";
+import { createPrompt, createLog } from "@/lib/actions";
 import {
   TARGET_AIS,
   LOG_TYPES,
@@ -138,12 +134,6 @@ export default function TaskWorkspace({
               >
                 {showPromptForm ? "닫기" : "+ 프롬프트 저장"}
               </button>
-              <form action={generateNextPrompt}>
-                <input type="hidden" name="taskId" value={taskId} />
-                <button className="text-sm px-3 py-1.5 rounded-md border border-amber-700/60 text-amber-200 hover:bg-amber-900/30">
-                  ⚡ 다음 프롬프트 생성
-                </button>
-              </form>
             </div>
 
             {showPromptForm && (

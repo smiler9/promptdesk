@@ -15,7 +15,11 @@ import {
   type LogType,
   type TemplateCategory,
 } from "./constants";
-import { buildTemplatePrompt } from "./nextPrompt";
+import {
+  buildTemplatePrompt,
+  isNextPromptType,
+  type NextPromptType,
+} from "./nextPrompt";
 
 function str(v: FormDataEntryValue | null): string {
   return (v ?? "").toString().trim();
@@ -632,12 +636,14 @@ export async function createPrompt(formData: FormData) {
   const taskId = str(formData.get("taskId"));
   const content = str(formData.get("content"));
   const targetAI = str(formData.get("targetAI")) as TargetAI;
+  const isGenerated = formData.get("isGenerated") === "true";
   if (!taskId || !content) return;
   await prisma.prompt.create({
     data: {
       taskId,
       content,
       targetAI: TARGET_AIS.includes(targetAI) ? targetAI : "Claude",
+      isGenerated,
     },
   });
   revalidatePath(`/tasks/${taskId}`);
@@ -931,30 +937,56 @@ export async function deleteDecision(formData: FormData) {
 export async function generateNextPrompt(formData: FormData) {
   const taskId = str(formData.get("taskId"));
   if (!taskId) return;
+  const promptTypeInput = str(formData.get("promptType"));
+  const promptType: NextPromptType = isNextPromptType(promptTypeInput)
+    ? promptTypeInput
+    : "Continue Implementation";
+  const targetAIInput = str(formData.get("targetAI"));
+  const targetAI = TARGET_AIS.includes(targetAIInput as TargetAI)
+    ? (targetAIInput as TargetAI)
+    : "Codex";
 
   const task = await prisma.task.findUnique({
     where: { id: taskId },
     include: {
       project: { include: { decisions: true } },
-      prompts: { orderBy: { createdAt: "desc" }, take: 1 },
+      tags: { orderBy: { name: "asc" } },
+      prompts: { orderBy: { createdAt: "desc" }, take: 5 },
       logs: { orderBy: { createdAt: "desc" } },
+      reports: { orderBy: { createdAt: "desc" }, take: 4 },
+      checklistItems: {
+        orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+      },
+      gitCommits: { orderBy: { createdAt: "desc" }, take: 6 },
     },
   });
   if (!task) return;
 
   const draft = buildTemplatePrompt({
+    projectName: task.project.name,
     taskTitle: task.title,
+    taskStatus: task.status,
+    priority: task.priority,
+    tags: task.tags,
+    taskDescription: task.description,
+    prompts: task.prompts,
     lastPrompt: task.prompts[0] ?? null,
+    logs: task.logs,
     recentErrors: task.logs.filter((l) => l.type === "ERROR"),
     recentResponses: task.logs.filter((l) => l.type === "RESPONSE"),
+    reports: task.reports,
+    checklistItems: task.checklistItems,
+    gitCommits: task.gitCommits,
     decisions: task.project.decisions,
+    promptType,
+    targetAI,
   });
 
   await prisma.prompt.create({
     data: {
       taskId,
       content: draft,
-      targetAI: task.prompts[0]?.targetAI ?? "Claude Code",
+      targetAI,
       isGenerated: true,
     },
   });
