@@ -9,7 +9,12 @@ import ProjectTimeline from "@/components/ProjectTimeline";
 import GitCommitRecords from "@/components/GitCommitRecords";
 import ProjectExport from "@/components/ProjectExport";
 import ProjectStatusSummary from "@/components/ProjectStatusSummary";
-import { TASK_STATUSES, type TaskStatus } from "@/lib/constants";
+import {
+  TASK_PRIORITIES,
+  TASK_STATUSES,
+  type TaskPriority,
+  type TaskStatus,
+} from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +50,10 @@ export default async function ProjectPage({
   const taskStatus = TASK_STATUSES.includes(statusParam as TaskStatus)
     ? (statusParam as TaskStatus)
     : "ALL";
+  const priorityParam = firstParam(queryParams.taskPriority);
+  const taskPriority = TASK_PRIORITIES.includes(priorityParam as TaskPriority)
+    ? (priorityParam as TaskPriority)
+    : "ALL";
   const sortParam = firstParam(queryParams.taskSort);
   const taskSort: TaskSort =
     sortParam === "updated" || sortParam === "created" ? sortParam : "order";
@@ -62,6 +71,9 @@ export default async function ProjectPage({
   }
   if (taskStatus !== "ALL") {
     taskFilters.push({ status: taskStatus });
+  }
+  if (taskPriority !== "ALL") {
+    taskFilters.push({ priority: taskPriority });
   }
 
   const [project, timelineTasks] = await Promise.all([
@@ -84,7 +96,10 @@ export default async function ProjectPage({
               : taskSort === "created"
                   ? [{ isPinned: "desc" }, { createdAt: "desc" }]
                   : [{ isPinned: "desc" }, { order: "asc" }],
-          include: { _count: { select: { prompts: true, logs: true } } },
+          include: {
+            tags: { orderBy: { name: "asc" } },
+            _count: { select: { prompts: true, logs: true } },
+          },
         },
       },
     }),
@@ -97,6 +112,7 @@ export default async function ProjectPage({
         title: true,
         description: true,
         isPinned: true,
+        priority: true,
         status: true,
         order: true,
         createdAt: true,
@@ -108,6 +124,16 @@ export default async function ProjectPage({
             content: true,
             targetAI: true,
             isGenerated: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+        tags: {
+          orderBy: { name: "asc" },
+          select: {
+            id: true,
+            name: true,
+            color: true,
             createdAt: true,
             updatedAt: true,
           },
@@ -207,6 +233,7 @@ export default async function ProjectPage({
             tasks={project.tasks}
             query={taskQuery}
             status={taskStatus}
+            priority={taskPriority}
             sort={taskSort}
           />
         </div>

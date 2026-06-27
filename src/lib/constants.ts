@@ -17,6 +17,9 @@ export const TASK_STATUSES = [
 ] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
+export const TASK_PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;
+export type TaskPriority = (typeof TASK_PRIORITIES)[number];
+
 export const LOG_TYPES = ["RESPONSE", "ERROR", "NOTE"] as const;
 export type LogType = (typeof LOG_TYPES)[number];
 
@@ -40,6 +43,16 @@ export const STATUS_META: Record<
   IN_PROGRESS: { label: "IN PROGRESS", cls: "bg-blue-600/80 text-blue-50" },
   DONE: { label: "DONE", cls: "bg-emerald-600/80 text-emerald-50" },
   BLOCKED: { label: "BLOCKED", cls: "bg-rose-600/80 text-rose-50" },
+};
+
+export const PRIORITY_META: Record<
+  TaskPriority,
+  { label: string; cls: string }
+> = {
+  LOW: { label: "LOW", cls: "bg-slate-700 text-slate-200" },
+  MEDIUM: { label: "MEDIUM", cls: "bg-sky-600/80 text-sky-50" },
+  HIGH: { label: "HIGH", cls: "bg-amber-600/80 text-amber-50" },
+  URGENT: { label: "URGENT", cls: "bg-rose-600/80 text-rose-50" },
 };
 
 export const LOG_META: Record<LogType, { label: string; cls: string }> = {

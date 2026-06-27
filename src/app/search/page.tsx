@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { PRIORITY_META, type TaskPriority } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,8 @@ type SearchResult = {
   projectName?: string;
   taskName?: string;
   isPinned?: boolean;
+  priority?: string;
+  tags?: { id: string; name: string; color: string | null }[];
   createdAt: Date;
   updatedAt: Date;
 };
@@ -70,9 +73,14 @@ async function runGlobalSearch(query: string) {
         OR: [
           { title: { contains: query } },
           { description: { contains: query } },
+          { priority: { contains: query } },
+          { tags: { some: { name: { contains: query } } } },
         ],
       },
-      include: { project: { select: { id: true, name: true } } },
+      include: {
+        project: { select: { id: true, name: true } },
+        tags: { orderBy: { name: "asc" } },
+      },
       orderBy: { updatedAt: "desc" },
       take: 30,
     }),
@@ -185,6 +193,8 @@ async function runGlobalSearch(query: string) {
       projectName: task.project.name,
       taskName: task.title,
       isPinned: task.isPinned,
+      priority: task.priority,
+      tags: task.tags,
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
     })),
@@ -359,6 +369,17 @@ export default async function SearchPage({
                             고정
                           </span>
                         )}
+                        {result.priority && (
+                          <span
+                            className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded ${
+                              PRIORITY_META[result.priority as TaskPriority]
+                                ?.cls ?? PRIORITY_META.MEDIUM.cls
+                            }`}
+                          >
+                            {PRIORITY_META[result.priority as TaskPriority]
+                              ?.label ?? result.priority}
+                          </span>
+                        )}
                         <h2 className="text-sm font-medium truncate">
                           {result.title}
                         </h2>
@@ -383,6 +404,19 @@ export default async function SearchPage({
                         Task: {result.taskName}
                       </span>
                     )}
+                    {result.tags?.map((tag) => (
+                      <span
+                        key={tag.id}
+                        className="rounded-full border border-slate-700 px-2 py-1"
+                        style={
+                          tag.color
+                            ? { borderColor: tag.color, color: tag.color }
+                            : undefined
+                        }
+                      >
+                        #{tag.name}
+                      </span>
+                    ))}
                   </div>
                 </Link>
               );

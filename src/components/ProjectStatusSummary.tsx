@@ -1,6 +1,13 @@
 import Link from "next/link";
 import CopyButton from "./CopyButton";
-import { STATUS_META, TASK_STATUSES, type TaskStatus } from "@/lib/constants";
+import {
+  PRIORITY_META,
+  TASK_PRIORITIES,
+  STATUS_META,
+  TASK_STATUSES,
+  type TaskPriority,
+  type TaskStatus,
+} from "@/lib/constants";
 
 type SummaryPrompt = {
   id: string;
@@ -24,6 +31,7 @@ type SummaryTask = {
   id: string;
   title: string;
   status: string;
+  priority: string;
   isPinned: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -86,12 +94,14 @@ function buildMarkdown({
   reportCount,
   commitCount,
   pinnedTaskCount,
+  priorityCounts,
   recentTask,
   recentLog,
   recentReport,
   recentCommit,
   blockedCount,
   unpushedReportCount,
+  urgentTaskCount,
 }: {
   projectName: string;
   totalTasks: number;
@@ -104,12 +114,14 @@ function buildMarkdown({
   reportCount: number;
   commitCount: number;
   pinnedTaskCount: number;
+  priorityCounts: Record<TaskPriority, number>;
   recentTask?: SummaryTask;
   recentLog?: RecentLog;
   recentReport?: RecentReport;
   recentCommit?: SummaryGitCommit;
   blockedCount: number;
   unpushedReportCount: number;
+  urgentTaskCount: number;
 }) {
   const lines: string[] = [];
   lines.push(`# 프로젝트 상태 요약: ${projectName}`);
@@ -127,6 +139,9 @@ function buildMarkdown({
   lines.push(markdownLine("실행 리포트", reportCount));
   lines.push(markdownLine("Git 커밋 기록", commitCount));
   lines.push(markdownLine("고정 Task", pinnedTaskCount));
+  for (const priority of TASK_PRIORITIES) {
+    lines.push(markdownLine(priority, priorityCounts[priority]));
+  }
   lines.push("");
   lines.push("## 최근 활동");
   lines.push(
@@ -171,10 +186,16 @@ function buildMarkdown({
   );
   lines.push("");
   lines.push("## 위험 신호");
-  if (blockedCount === 0 && errorLogCount === 0 && unpushedReportCount === 0) {
+  if (
+    blockedCount === 0 &&
+    errorLogCount === 0 &&
+    unpushedReportCount === 0 &&
+    urgentTaskCount === 0
+  ) {
     lines.push("- 위험 신호 없음");
   } else {
     if (blockedCount > 0) lines.push(markdownLine("BLOCKED Task", blockedCount));
+    if (urgentTaskCount > 0) lines.push(markdownLine("URGENT Task", urgentTaskCount));
     if (errorLogCount > 0) lines.push(markdownLine("ERROR 로그", errorLogCount));
     if (unpushedReportCount > 0) {
       lines.push(markdownLine("원격 push 미완료 리포트", unpushedReportCount));
@@ -198,10 +219,17 @@ export default function ProjectStatusSummary({
     (acc, status) => ({ ...acc, [status]: 0 }),
     {} as Record<TaskStatus, number>
   );
+  const priorityCounts = TASK_PRIORITIES.reduce(
+    (acc, priority) => ({ ...acc, [priority]: 0 }),
+    {} as Record<TaskPriority, number>
+  );
 
   for (const task of tasks) {
     if (TASK_STATUSES.includes(task.status as TaskStatus)) {
       statusCounts[task.status as TaskStatus] += 1;
+    }
+    if (TASK_PRIORITIES.includes(task.priority as TaskPriority)) {
+      priorityCounts[task.priority as TaskPriority] += 1;
     }
   }
 
@@ -230,6 +258,7 @@ export default function ProjectStatusSummary({
   const reportCount = reports.length;
   const commitCount = gitCommits.length;
   const pinnedTaskCount = tasks.filter((task) => task.isPinned).length;
+  const highUrgentTaskCount = priorityCounts.HIGH + priorityCounts.URGENT;
   const unpushedReportCount = reports.filter(
     (report) => !report.pushedToRemote
   ).length;
@@ -259,12 +288,14 @@ export default function ProjectStatusSummary({
     reportCount,
     commitCount,
     pinnedTaskCount,
+    priorityCounts,
     recentTask,
     recentLog,
     recentReport,
     recentCommit,
     blockedCount: statusCounts.BLOCKED,
     unpushedReportCount,
+    urgentTaskCount: priorityCounts.URGENT,
   });
 
   const summaryStats = [
@@ -277,11 +308,13 @@ export default function ProjectStatusSummary({
     { label: "실행 리포트", value: reportCount },
     { label: "Git 커밋", value: commitCount },
     { label: "고정 Task", value: pinnedTaskCount },
+    { label: "HIGH/URGENT", value: highUrgentTaskCount },
   ];
   const risks = [
     statusCounts.BLOCKED > 0
       ? `BLOCKED Task ${statusCounts.BLOCKED}개`
       : null,
+    priorityCounts.URGENT > 0 ? `URGENT Task ${priorityCounts.URGENT}개` : null,
     errorLogCount > 0 ? `ERROR 로그 ${errorLogCount}개` : null,
     unpushedReportCount > 0
       ? `원격 push 미완료 리포트 ${unpushedReportCount}개`
@@ -331,6 +364,26 @@ export default function ProjectStatusSummary({
             </span>
             <div className="text-lg font-semibold mt-2">
               {statusCounts[status]}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+        {TASK_PRIORITIES.map((priority) => (
+          <div
+            key={priority}
+            className="rounded-md border border-slate-800 bg-slate-900/40 px-3 py-2"
+          >
+            <span
+              className={`text-[10px] px-1.5 py-0.5 rounded ${
+                PRIORITY_META[priority].cls
+              }`}
+            >
+              {PRIORITY_META[priority].label}
+            </span>
+            <div className="text-lg font-semibold mt-2">
+              {priorityCounts[priority]}
             </div>
           </div>
         ))}

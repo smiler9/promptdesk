@@ -3,14 +3,23 @@
 import Link from "next/link";
 import { useState } from "react";
 import { createTask, toggleTaskPin, updateTaskStatus } from "@/lib/actions";
-import { STATUS_META, TASK_STATUSES, type TaskStatus } from "@/lib/constants";
+import {
+  PRIORITY_META,
+  STATUS_META,
+  TASK_PRIORITIES,
+  TASK_STATUSES,
+  type TaskPriority,
+  type TaskStatus,
+} from "@/lib/constants";
 
 type Task = {
   id: string;
   title: string;
   description: string | null;
   isPinned: boolean;
+  priority: string;
   status: string;
+  tags: { id: string; name: string; color: string | null }[];
   _count: { prompts: number; logs: number };
 };
 type TaskSort = "order" | "updated" | "created";
@@ -20,16 +29,19 @@ export default function TaskList({
   tasks,
   query,
   status,
+  priority,
   sort,
 }: {
   projectId: string;
   tasks: Task[];
   query: string;
   status: "ALL" | TaskStatus;
+  priority: "ALL" | TaskPriority;
   sort: TaskSort;
 }) {
   const [adding, setAdding] = useState(false);
-  const hasFilters = query !== "" || status !== "ALL" || sort !== "order";
+  const hasFilters =
+    query !== "" || status !== "ALL" || priority !== "ALL" || sort !== "order";
 
   return (
     <div className="rounded-xl border border-slate-800 bg-[#0d1320] p-4">
@@ -45,7 +57,7 @@ export default function TaskList({
 
       <form
         method="get"
-        className="grid grid-cols-1 md:grid-cols-[1fr_150px_150px_auto] gap-2 mb-3"
+        className="grid grid-cols-1 md:grid-cols-[1fr_150px_150px_150px_auto] gap-2 mb-3"
       >
         <input
           name="taskQ"
@@ -62,6 +74,18 @@ export default function TaskList({
           {TASK_STATUSES.map((s) => (
             <option key={s} value={s}>
               {STATUS_META[s].label}
+            </option>
+          ))}
+        </select>
+        <select
+          name="taskPriority"
+          defaultValue={priority}
+          className="text-sm rounded-md border border-slate-700 bg-slate-900 px-3 py-2"
+        >
+          <option value="ALL">전체 우선순위</option>
+          {TASK_PRIORITIES.map((p) => (
+            <option key={p} value={p}>
+              {PRIORITY_META[p].label}
             </option>
           ))}
         </select>
@@ -148,7 +172,16 @@ export default function TaskList({
                 href={`/tasks/${t.id}`}
                 className="flex-1 min-w-0 hover:text-indigo-300"
               >
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                  <span
+                    className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded ${
+                      PRIORITY_META[t.priority as TaskPriority]?.cls ??
+                      PRIORITY_META.MEDIUM.cls
+                    }`}
+                  >
+                    {PRIORITY_META[t.priority as TaskPriority]?.label ??
+                      t.priority}
+                  </span>
                   <div className="text-sm truncate">{t.title}</div>
                   {t.isPinned && (
                     <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-amber-600/80 text-amber-50">
@@ -159,6 +192,23 @@ export default function TaskList({
                 {t.description && (
                   <div className="text-xs text-slate-500 truncate mt-0.5">
                     {t.description}
+                  </div>
+                )}
+                {t.tags.length > 0 && (
+                  <div className="flex gap-1 mt-1 flex-wrap">
+                    {t.tags.map((tag) => (
+                      <span
+                        key={tag.id}
+                        className="text-[10px] px-1.5 py-0.5 rounded-full border border-slate-700 text-slate-300"
+                        style={
+                          tag.color
+                            ? { borderColor: tag.color, color: tag.color }
+                            : undefined
+                        }
+                      >
+                        #{tag.name}
+                      </span>
+                    ))}
                   </div>
                 )}
               </Link>

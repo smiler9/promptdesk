@@ -27,6 +27,8 @@ model Task {
   title       String
   description String?
   isPinned    Boolean    @default(false)
+  // "LOW" | "MEDIUM" | "HIGH" | "URGENT"
+  priority    String     @default("MEDIUM")
   // "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED"
   status      String     @default("TODO")
   order       Int        @default(0)
@@ -36,8 +38,22 @@ model Task {
   logs        LogEntry[]
   reports     TaskExecutionReport[]
   gitCommits  GitCommitRecord[]
+  tags        TaskTag[]
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+}
+
+model TaskTag {
+  id        String   @id @default(cuid())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId    String
+  name      String
+  color     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([taskId])
+  @@unique([taskId, name])
 }
 
 model Prompt {

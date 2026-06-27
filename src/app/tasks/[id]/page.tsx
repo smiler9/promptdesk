@@ -19,6 +19,7 @@ export default async function TaskPage({
       where: { id },
       include: {
         project: { select: { id: true, name: true } },
+        tags: { orderBy: { name: "asc" } },
         prompts: { orderBy: { createdAt: "desc" } },
         logs: { orderBy: { createdAt: "desc" } },
         reports: { orderBy: { createdAt: "desc" } },
@@ -59,6 +60,8 @@ export default async function TaskPage({
           title={task.title}
           description={task.description}
           status={task.status}
+          priority={task.priority}
+          tags={task.tags}
         />
       </div>
 

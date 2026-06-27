@@ -1,6 +1,13 @@
 "use client";
 
-import { LOG_META, STATUS_META, type LogType, type TaskStatus } from "@/lib/constants";
+import {
+  LOG_META,
+  PRIORITY_META,
+  STATUS_META,
+  type LogType,
+  type TaskPriority,
+  type TaskStatus,
+} from "@/lib/constants";
 
 type Timestamp = Date | string;
 
@@ -34,6 +41,14 @@ type ExportLog = {
   id: string;
   type: string;
   content: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};
+
+type ExportTag = {
+  id: string;
+  name: string;
+  color: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
@@ -75,10 +90,12 @@ type ExportTask = {
   title: string;
   description: string | null;
   isPinned?: boolean;
+  priority?: string;
   status: string;
   order: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  tags: ExportTag[];
   prompts: ExportPrompt[];
   logs: ExportLog[];
   reports: ExportReport[];
@@ -256,6 +273,11 @@ function buildJsonExport({
         createdAt: toIso(prompt.createdAt),
         updatedAt: toIso(prompt.updatedAt),
       })),
+      tags: task.tags.map((tag) => ({
+        ...tag,
+        createdAt: toIso(tag.createdAt),
+        updatedAt: toIso(tag.updatedAt),
+      })),
       logs: task.logs.map((log) => ({
         ...log,
         createdAt: toIso(log.createdAt),
@@ -327,12 +349,22 @@ function buildMarkdownExport({
   } else {
     for (const task of tasks) {
       const status = STATUS_META[task.status as TaskStatus];
+      const priority =
+        PRIORITY_META[task.priority as TaskPriority] ?? PRIORITY_META.MEDIUM;
       lines.push(`### ${task.title}`);
       lines.push("");
       lines.push(`- Status: ${status?.label ?? task.status}`);
+      lines.push(`- Priority: ${priority.label}`);
       lines.push(`- Created: ${formatDate(task.createdAt)}`);
       lines.push(`- Updated: ${formatDate(task.updatedAt)}`);
       lines.push(`- Pinned: ${task.isPinned ? "yes" : "no"}`);
+      lines.push(
+        `- Tags: ${
+          task.tags.length > 0
+            ? task.tags.map((tag) => `#${tag.name}`).join(", ")
+            : "없음"
+        }`
+      );
       lines.push(`- Description: ${task.description || "없음"}`);
       lines.push("");
 

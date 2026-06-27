@@ -5,10 +5,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   TASK_STATUSES,
+  TASK_PRIORITIES,
   TARGET_AIS,
   LOG_TYPES,
   TEMPLATE_CATEGORIES,
   type TaskStatus,
+  type TaskPriority,
   type TargetAI,
   type LogType,
   type TemplateCategory,
@@ -47,6 +49,15 @@ function dateField(value: unknown): Date | undefined {
   if (typeof value !== "string") return undefined;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+function tagName(v: FormDataEntryValue | null): string {
+  return str(v).replace(/\s+/g, "-").toLowerCase();
+}
+
+function tagColor(v: FormDataEntryValue | null): string | null {
+  const color = str(v);
+  return /^#[0-9a-fA-F]{6}$/.test(color) ? color : null;
 }
 
 async function resolveGitCommitLinks({
@@ -221,6 +232,11 @@ export async function importProjectFromJson(formData: FormData) {
             title,
             description: nullableStringField(task.description),
             isPinned: booleanField(task.isPinned),
+            priority: TASK_PRIORITIES.includes(
+              stringField(task.priority) as TaskPriority
+            )
+              ? stringField(task.priority)
+              : "MEDIUM",
             status: TASK_STATUSES.includes(status) ? status : "TODO",
             order: typeof task.order === "number" ? task.order : 0,
             createdAt: dateField(task.createdAt),
@@ -231,6 +247,30 @@ export async function importProjectFromJson(formData: FormData) {
 
         const oldTaskId = stringField(task.id);
         if (oldTaskId) taskIdMap.set(oldTaskId, createdTask.id);
+
+        for (const tag of arrayField(task.tags)) {
+          const name = stringField(tag.name).replace(/\s+/g, "-").toLowerCase();
+          if (!name) continue;
+          await tx.taskTag.upsert({
+            where: {
+              taskId_name: {
+                taskId: createdTask.id,
+                name,
+              },
+            },
+            update: {
+              color: nullableStringField(tag.color),
+              updatedAt: dateField(tag.updatedAt),
+            },
+            create: {
+              taskId: createdTask.id,
+              name,
+              color: nullableStringField(tag.color),
+              createdAt: dateField(tag.createdAt),
+              updatedAt: dateField(tag.updatedAt),
+            },
+          });
+        }
 
         for (const prompt of arrayField(task.prompts)) {
           const content = stringField(prompt.content);
@@ -378,6 +418,20 @@ export async function updateTaskStatus(formData: FormData) {
   revalidatePath("/");
 }
 
+export async function updateTaskPriority(formData: FormData) {
+  const id = str(formData.get("id"));
+  const priority = str(formData.get("priority")) as TaskPriority;
+  if (!id || !TASK_PRIORITIES.includes(priority)) return;
+  const task = await prisma.task.update({
+    where: { id },
+    data: { priority },
+    select: { projectId: true },
+  });
+  revalidatePath(`/projects/${task.projectId}`);
+  revalidatePath(`/tasks/${id}`);
+  revalidatePath("/search");
+}
+
 export async function toggleTaskPin(formData: FormData) {
   const id = str(formData.get("id"));
   if (!id) return;
@@ -407,6 +461,45 @@ export async function updateTask(formData: FormData) {
   });
   revalidatePath(`/projects/${t.projectId}`);
   revalidatePath(`/tasks/${id}`);
+}
+
+export async function createTaskTag(formData: FormData) {
+  const taskId = str(formData.get("taskId"));
+  const name = tagName(formData.get("name"));
+  const color = tagColor(formData.get("color"));
+  if (!taskId || !name) return;
+
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { projectId: true },
+  });
+  if (!task) return;
+
+  await prisma.taskTag.upsert({
+    where: { taskId_name: { taskId, name } },
+    update: { color },
+    create: { taskId, name, color },
+  });
+  revalidatePath(`/projects/${task.projectId}`);
+  revalidatePath(`/tasks/${taskId}`);
+  revalidatePath("/search");
+}
+
+export async function deleteTaskTag(formData: FormData) {
+  const id = str(formData.get("id"));
+  const taskId = str(formData.get("taskId"));
+  if (!id || !taskId) return;
+
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { projectId: true },
+  });
+  if (!task) return;
+
+  await prisma.taskTag.delete({ where: { id } });
+  revalidatePath(`/projects/${task.projectId}`);
+  revalidatePath(`/tasks/${taskId}`);
+  revalidatePath("/search");
 }
 
 export async function deleteTask(formData: FormData) {
