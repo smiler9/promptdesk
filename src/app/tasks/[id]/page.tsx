@@ -12,14 +12,19 @@ export default async function TaskPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const task = await prisma.task.findUnique({
-    where: { id },
-    include: {
-      project: { select: { id: true, name: true } },
-      prompts: { orderBy: { createdAt: "desc" } },
-      logs: { orderBy: { createdAt: "desc" } },
-    },
-  });
+  const [task, templates] = await Promise.all([
+    prisma.task.findUnique({
+      where: { id },
+      include: {
+        project: { select: { id: true, name: true } },
+        prompts: { orderBy: { createdAt: "desc" } },
+        logs: { orderBy: { createdAt: "desc" } },
+      },
+    }),
+    prisma.promptTemplate.findMany({
+      orderBy: [{ category: "asc" }, { title: "asc" }],
+    }),
+  ]);
 
   if (!task) notFound();
 
@@ -52,6 +57,7 @@ export default async function TaskPage({
           taskId={task.id}
           prompts={task.prompts}
           logs={task.logs}
+          templates={templates}
         />
       </div>
     </div>

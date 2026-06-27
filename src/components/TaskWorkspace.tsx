@@ -8,7 +8,15 @@ import {
   createLog,
   generateNextPrompt,
 } from "@/lib/actions";
-import { TARGET_AIS, LOG_TYPES, LOG_META, type LogType } from "@/lib/constants";
+import {
+  TARGET_AIS,
+  LOG_TYPES,
+  LOG_META,
+  TEMPLATE_CATEGORY_META,
+  type LogType,
+  type TargetAI,
+  type TemplateCategory,
+} from "@/lib/constants";
 
 type Prompt = {
   id: string;
@@ -23,21 +31,35 @@ type Log = {
   content: string;
   createdAt: Date;
 };
+type PromptTemplate = {
+  id: string;
+  title: string;
+  description: string | null;
+  targetAI: string;
+  category: string;
+  content: string;
+};
 
 export default function TaskWorkspace({
   taskId,
   prompts,
   logs,
+  templates,
 }: {
   taskId: string;
   prompts: Prompt[];
   logs: Log[];
+  templates: PromptTemplate[];
 }) {
   const [tab, setTab] = useState<"prompts" | "logs">("prompts");
   const [showPromptForm, setShowPromptForm] = useState(false);
   const [showLogForm, setShowLogForm] = useState(false);
   const [query, setQuery] = useState("");
   const [logFilter, setLogFilter] = useState<"ALL" | LogType>("ALL");
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [promptTargetAI, setPromptTargetAI] =
+    useState<TargetAI>("Claude Code");
+  const [promptContent, setPromptContent] = useState("");
 
   const filteredPrompts = useMemo(
     () =>
@@ -58,6 +80,17 @@ export default function TaskWorkspace({
       }),
     [logs, query, logFilter]
   );
+
+  function applyTemplate(templateId: string) {
+    setSelectedTemplateId(templateId);
+    const template = templates.find((t) => t.id === templateId);
+    if (!template) return;
+    const targetAI = TARGET_AIS.includes(template.targetAI as TargetAI)
+      ? (template.targetAI as TargetAI)
+      : "Claude Code";
+    setPromptTargetAI(targetAI);
+    setPromptContent(template.content);
+  }
 
   return (
     <div className="rounded-xl border border-slate-800 bg-[#0d1320]">
@@ -116,24 +149,59 @@ export default function TaskWorkspace({
               <form
                 action={async (fd) => {
                   await createPrompt(fd);
+                  setPromptContent("");
+                  setPromptTargetAI("Claude Code");
+                  setSelectedTemplateId("");
                   setShowPromptForm(false);
                 }}
                 className="space-y-2 rounded-lg border border-slate-800 p-3"
               >
                 <input type="hidden" name="taskId" value={taskId} />
-                <select
-                  name="targetAI"
-                  defaultValue="Claude Code"
-                  className="text-xs rounded-md border border-slate-700 bg-slate-900 px-2 py-1"
-                >
-                  {TARGET_AIS.map((ai) => (
-                    <option key={ai} value={ai}>
-                      {ai}
-                    </option>
-                  ))}
-                </select>
+                {templates.length > 0 && (
+                  <select
+                    value={selectedTemplateId}
+                    onChange={(e) => applyTemplate(e.target.value)}
+                    className="w-full text-xs rounded-md border border-slate-700 bg-slate-900 px-2 py-1"
+                  >
+                    <option value="">템플릿 선택...</option>
+                    {templates.map((template) => {
+                      const category =
+                        TEMPLATE_CATEGORY_META[
+                          template.category as TemplateCategory
+                        ] ?? TEMPLATE_CATEGORY_META.Other;
+                      return (
+                        <option key={template.id} value={template.id}>
+                          [{category.label}] {template.title}
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <select
+                    name="targetAI"
+                    value={promptTargetAI}
+                    onChange={(e) =>
+                      setPromptTargetAI(e.target.value as TargetAI)
+                    }
+                    className="text-xs rounded-md border border-slate-700 bg-slate-900 px-2 py-1"
+                  >
+                    {TARGET_AIS.map((ai) => (
+                      <option key={ai} value={ai}>
+                        {ai}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedTemplateId && (
+                    <span className="text-[11px] text-slate-500">
+                      템플릿 내용이 작성 영역에 불러와졌습니다.
+                    </span>
+                  )}
+                </div>
                 <textarea
                   name="content"
+                  value={promptContent}
+                  onChange={(e) => setPromptContent(e.target.value)}
                   required
                   rows={6}
                   placeholder="AI에게 보낸 프롬프트를 붙여넣으세요…"

@@ -42,6 +42,12 @@ export default async function RootLayout({
               >
                 ▤ 대시보드
               </Link>
+              <Link
+                href="/templates"
+                className="block px-3 py-2 rounded-md text-sm text-slate-300 hover:bg-slate-800/60"
+              >
+                ▣ 템플릿
+              </Link>
             </nav>
 
             <div className="px-3 pt-2 pb-1 text-[11px] uppercase tracking-wider text-slate-500">

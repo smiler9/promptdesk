@@ -20,6 +20,18 @@ export type TaskStatus = (typeof TASK_STATUSES)[number];
 export const LOG_TYPES = ["RESPONSE", "ERROR", "NOTE"] as const;
 export type LogType = (typeof LOG_TYPES)[number];
 
+export const TEMPLATE_CATEGORIES = [
+  "Bugfix",
+  "Feature",
+  "Refactor",
+  "Test",
+  "Docs",
+  "Review",
+  "Deploy",
+  "Other",
+] as const;
+export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number];
+
 export const STATUS_META: Record<
   TaskStatus,
   { label: string; cls: string }
@@ -34,4 +46,18 @@ export const LOG_META: Record<LogType, { label: string; cls: string }> = {
   RESPONSE: { label: "AI 응답", cls: "bg-indigo-600/80 text-indigo-50" },
   ERROR: { label: "에러", cls: "bg-rose-600/80 text-rose-50" },
   NOTE: { label: "메모", cls: "bg-slate-600 text-slate-100" },
+};
+
+export const TEMPLATE_CATEGORY_META: Record<
+  TemplateCategory,
+  { label: string; cls: string }
+> = {
+  Bugfix: { label: "Bugfix", cls: "bg-rose-600/80 text-rose-50" },
+  Feature: { label: "Feature", cls: "bg-indigo-600/80 text-indigo-50" },
+  Refactor: { label: "Refactor", cls: "bg-sky-600/80 text-sky-50" },
+  Test: { label: "Test", cls: "bg-emerald-600/80 text-emerald-50" },
+  Docs: { label: "Docs", cls: "bg-amber-600/80 text-amber-50" },
+  Review: { label: "Review", cls: "bg-violet-600/80 text-violet-50" },
+  Deploy: { label: "Deploy", cls: "bg-cyan-600/80 text-cyan-50" },
+  Other: { label: "Other", cls: "bg-slate-600 text-slate-100" },
 };

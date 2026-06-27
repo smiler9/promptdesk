@@ -7,9 +7,11 @@ import {
   TASK_STATUSES,
   TARGET_AIS,
   LOG_TYPES,
+  TEMPLATE_CATEGORIES,
   type TaskStatus,
   type TargetAI,
   type LogType,
+  type TemplateCategory,
 } from "./constants";
 import { buildTemplatePrompt } from "./nextPrompt";
 
@@ -137,6 +139,57 @@ export async function deletePrompt(formData: FormData) {
   if (!id) return;
   await prisma.prompt.delete({ where: { id } });
   revalidatePath(`/tasks/${taskId}`);
+}
+
+/* ---------- PromptTemplate ---------- */
+
+export async function createPromptTemplate(formData: FormData) {
+  const title = str(formData.get("title"));
+  const description = str(formData.get("description")) || null;
+  const targetAI = str(formData.get("targetAI")) as TargetAI;
+  const category = str(formData.get("category")) as TemplateCategory;
+  const content = str(formData.get("content"));
+  if (!title || !content) return;
+
+  await prisma.promptTemplate.create({
+    data: {
+      title,
+      description,
+      targetAI: TARGET_AIS.includes(targetAI) ? targetAI : "Claude Code",
+      category: TEMPLATE_CATEGORIES.includes(category) ? category : "Other",
+      content,
+    },
+  });
+  revalidatePath("/templates");
+}
+
+export async function updatePromptTemplate(formData: FormData) {
+  const id = str(formData.get("id"));
+  const title = str(formData.get("title"));
+  const description = str(formData.get("description")) || null;
+  const targetAI = str(formData.get("targetAI")) as TargetAI;
+  const category = str(formData.get("category")) as TemplateCategory;
+  const content = str(formData.get("content"));
+  if (!id || !title || !content) return;
+
+  await prisma.promptTemplate.update({
+    where: { id },
+    data: {
+      title,
+      description,
+      targetAI: TARGET_AIS.includes(targetAI) ? targetAI : "Claude Code",
+      category: TEMPLATE_CATEGORIES.includes(category) ? category : "Other",
+      content,
+    },
+  });
+  revalidatePath("/templates");
+}
+
+export async function deletePromptTemplate(formData: FormData) {
+  const id = str(formData.get("id"));
+  if (!id) return;
+  await prisma.promptTemplate.delete({ where: { id } });
+  revalidatePath("/templates");
 }
 
 /* ---------- LogEntry ---------- */
