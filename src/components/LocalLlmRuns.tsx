@@ -1,3 +1,13 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  convertLocalLLMRunToErrorLog,
+  convertLocalLLMRunToLog,
+  convertLocalLLMRunToPrompt,
+} from "@/lib/actions";
+
 type LocalLLMRun = {
   id: string;
   model: string;
@@ -8,6 +18,13 @@ type LocalLLMRun = {
   durationMs: number | null;
   createdAt: Date | string;
   updatedAt: Date | string;
+};
+
+type ConversionAction = "log" | "prompt" | "error";
+type ConversionResult = {
+  ok?: boolean;
+  message?: string;
+  error?: string;
 };
 
 function formatDate(value: Date | string) {
@@ -30,6 +47,38 @@ function formatDuration(value: number | null) {
 }
 
 export default function LocalLlmRuns({ runs }: { runs: LocalLLMRun[] }) {
+  const router = useRouter();
+  const [messages, setMessages] = useState<Record<string, ConversionResult>>(
+    {}
+  );
+  const [pending, setPending] = useState<string | null>(null);
+
+  async function convert(runId: string, action: ConversionAction) {
+    const pendingKey = `${runId}:${action}`;
+    setPending(pendingKey);
+    const formData = new FormData();
+    formData.set("id", runId);
+
+    try {
+      const result =
+        action === "log"
+          ? await convertLocalLLMRunToLog(formData)
+          : action === "prompt"
+            ? await convertLocalLLMRunToPrompt(formData)
+            : await convertLocalLLMRunToErrorLog(formData);
+
+      setMessages((current) => ({ ...current, [runId]: result }));
+      if (!result.error) router.refresh();
+    } catch {
+      setMessages((current) => ({
+        ...current,
+        [runId]: { error: "변환 중 오류가 발생했습니다." },
+      }));
+    } finally {
+      setPending(null);
+    }
+  }
+
   return (
     <section className="rounded-xl border border-slate-800 bg-[#0d1320] p-4">
       <div className="flex items-center justify-between gap-3 mb-3">
@@ -103,6 +152,57 @@ export default function LocalLlmRuns({ runs }: { runs: LocalLLMRun[] }) {
                       : excerpt(run.errorMessage)}
                   </p>
                 </div>
+              </div>
+
+              <div className="mt-3 flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => convert(run.id, "log")}
+                  disabled={!run.response?.trim() || pending === `${run.id}:log`}
+                  className="text-[11px] px-2 py-1 rounded border border-indigo-700/60 text-indigo-200 hover:bg-indigo-900/30 disabled:opacity-50"
+                >
+                  {pending === `${run.id}:log`
+                    ? "저장 중..."
+                    : "응답을 로그로 저장"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => convert(run.id, "prompt")}
+                  disabled={
+                    !run.response?.trim() || pending === `${run.id}:prompt`
+                  }
+                  className="text-[11px] px-2 py-1 rounded border border-amber-700/60 text-amber-200 hover:bg-amber-900/30 disabled:opacity-50"
+                >
+                  {pending === `${run.id}:prompt`
+                    ? "저장 중..."
+                    : "응답을 프롬프트로 저장"}
+                </button>
+                {run.status === "ERROR" && (
+                  <button
+                    type="button"
+                    onClick={() => convert(run.id, "error")}
+                    disabled={
+                      (!run.errorMessage?.trim() && !run.response?.trim()) ||
+                      pending === `${run.id}:error`
+                    }
+                    className="text-[11px] px-2 py-1 rounded border border-rose-700/60 text-rose-200 hover:bg-rose-900/30 disabled:opacity-50"
+                  >
+                    {pending === `${run.id}:error`
+                      ? "저장 중..."
+                      : "에러 로그로 저장"}
+                  </button>
+                )}
+                {messages[run.id] && (
+                  <span
+                    className={`text-[11px] ${
+                      messages[run.id].error
+                        ? "text-rose-300"
+                        : "text-emerald-300"
+                    }`}
+                  >
+                    {messages[run.id].error ?? messages[run.id].message}
+                  </span>
+                )}
               </div>
             </article>
           ))}

@@ -63,6 +63,17 @@ type GitCommitSummary = {
   createdAt: Timestamp;
 };
 
+type LocalLLMRunSummary = {
+  id: string;
+  model: string;
+  prompt: string;
+  response: string | null;
+  status: string;
+  errorMessage: string | null;
+  durationMs: number | null;
+  createdAt: Timestamp;
+};
+
 export default function NextAiPrompt({
   taskId,
   projectName,
@@ -74,6 +85,7 @@ export default function NextAiPrompt({
   prompts,
   logs,
   reports,
+  localLLMRuns,
   checklistItems,
   gitCommits,
 }: {
@@ -87,6 +99,7 @@ export default function NextAiPrompt({
   prompts: PromptSummary[];
   logs: LogSummary[];
   reports: ReportSummary[];
+  localLLMRuns: LocalLLMRunSummary[];
   checklistItems: ChecklistSummary[];
   gitCommits: GitCommitSummary[];
 }) {
@@ -111,6 +124,7 @@ export default function NextAiPrompt({
         recentErrors: logs.filter((log) => log.type === "ERROR"),
         recentResponses: logs.filter((log) => log.type === "RESPONSE"),
         reports,
+        localLLMRuns,
         checklistItems,
         gitCommits,
         decisions: [],
@@ -127,6 +141,7 @@ export default function NextAiPrompt({
       prompts,
       logs,
       reports,
+      localLLMRuns,
       checklistItems,
       gitCommits,
       promptType,
@@ -143,7 +158,8 @@ export default function NextAiPrompt({
           </h2>
           <p className="text-xs text-slate-500 mt-1">
             프롬프트 {prompts.length} · 로그 {logs.length} · 리포트{" "}
-            {reports.length} · 커밋 {gitCommits.length}
+            {reports.length} · Local LLM {localLLMRuns.length} · 커밋{" "}
+            {gitCommits.length}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

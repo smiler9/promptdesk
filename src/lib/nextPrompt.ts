@@ -52,6 +52,15 @@ type GitCommitLike = {
   pushedToRemote: boolean;
   createdAt: Timestamp;
 };
+type LocalLLMRunLike = {
+  model: string;
+  prompt: string;
+  response?: string | null;
+  status: string;
+  errorMessage?: string | null;
+  durationMs?: number | null;
+  createdAt: Timestamp;
+};
 
 export interface NextPromptContext {
   projectName?: string;
@@ -66,6 +75,7 @@ export interface NextPromptContext {
   recentErrors: LogLike[];
   recentResponses: LogLike[];
   reports?: ReportLike[];
+  localLLMRuns?: LocalLLMRunLike[];
   checklistItems?: ChecklistItemLike[];
   gitCommits?: GitCommitLike[];
   decisions: DecisionLike[];
@@ -100,6 +110,12 @@ function excerpt(value: string | null | undefined, length = 240) {
 
 function shortHash(hash: string) {
   return hash.length > 10 ? hash.slice(0, 10) : hash;
+}
+
+function formatDurationMs(value: number | null | undefined) {
+  if (typeof value !== "number") return "시간 미기록";
+  if (value < 1000) return `${value}ms`;
+  return `${(value / 1000).toFixed(value >= 10000 ? 1 : 2)}s`;
 }
 
 function sortByCreatedDesc<T extends { createdAt?: Timestamp }>(items: T[]) {
@@ -167,6 +183,7 @@ export function buildTemplatePrompt(ctx: NextPromptContext): string {
   ]);
   const errors = logs.filter((log) => log.type === "ERROR");
   const reports = sortByCreatedDesc(ctx.reports ?? []);
+  const localLLMRuns = sortByCreatedDesc(ctx.localLLMRuns ?? []);
   const checklistItems = [...(ctx.checklistItems ?? [])].sort((a, b) => {
     if ((a.order ?? 0) !== (b.order ?? 0)) return (a.order ?? 0) - (b.order ?? 0);
     const aTime = toDate(a.createdAt)?.getTime() ?? 0;
@@ -264,6 +281,25 @@ export function buildTemplatePrompt(ctx: NextPromptContext): string {
       if (report.nextSteps) {
         lines.push(`  - 다음 작업: ${excerpt(report.nextSteps, 220)}`);
       }
+    }
+  }
+  lines.push("");
+
+  lines.push("## Local LLM Runs 요약");
+  if (localLLMRuns.length === 0) {
+    lines.push("- 저장된 Local LLM 실행 기록 없음");
+  } else {
+    for (const run of localLLMRuns.slice(0, 5)) {
+      const body =
+        run.status === "ERROR"
+          ? run.errorMessage || run.response
+          : run.response || run.errorMessage;
+      lines.push(
+        `- ${formatDate(run.createdAt)} · ${run.model} · ${run.status} · ${formatDurationMs(
+          run.durationMs
+        )}: ${excerpt(body, 240)}`
+      );
+      lines.push(`  - 보낸 프롬프트: ${excerpt(run.prompt, 220)}`);
     }
   }
   lines.push("");

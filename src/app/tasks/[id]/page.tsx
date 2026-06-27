@@ -89,6 +89,7 @@ export default async function TaskPage({
           prompts={task.prompts}
           logs={task.logs}
           reports={task.reports}
+          localLLMRuns={task.localLLMRuns}
           checklistItems={task.checklistItems}
           gitCommits={task.gitCommits}
         />

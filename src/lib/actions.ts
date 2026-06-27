@@ -681,6 +681,119 @@ export async function createLocalLLMRun(formData: FormData) {
   return { ok: true };
 }
 
+function localLLMRunExcerpt(value: string | null | undefined, length = 360) {
+  const text = (value ?? "").trim().replace(/\s+/g, " ");
+  if (!text) return "내용 없음";
+  return text.length > length ? `${text.slice(0, length)}...` : text;
+}
+
+function formatLocalLLMRunDate(value: Date) {
+  return value.toLocaleString("ko-KR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function buildLocalLLMRunConversionContent({
+  run,
+  body,
+}: {
+  run: {
+    id: string;
+    model: string;
+    prompt: string;
+    status: string;
+    createdAt: Date;
+    durationMs: number | null;
+  };
+  body: string;
+}) {
+  return [
+    `Generated from Local LLM Run (${run.status})`,
+    `Model: ${run.model}`,
+    `Run ID: ${run.id}`,
+    `Executed: ${formatLocalLLMRunDate(run.createdAt)}`,
+    `Duration: ${run.durationMs === null ? "not recorded" : `${run.durationMs}ms`}`,
+    `Original prompt: ${localLLMRunExcerpt(run.prompt, 240)}`,
+    "",
+    body.trim(),
+  ].join("\n");
+}
+
+async function getLocalLLMRunForConversion(id: string) {
+  if (!id) return null;
+  return prisma.localLLMRun.findUnique({
+    where: { id },
+    include: {
+      task: { select: { id: true, projectId: true } },
+    },
+  });
+}
+
+export async function convertLocalLLMRunToLog(formData: FormData) {
+  const id = str(formData.get("id"));
+  const run = await getLocalLLMRunForConversion(id);
+  if (!run) return { error: "Local LLM 실행 기록을 찾을 수 없습니다." };
+  const response = run.response?.trim();
+  if (!response) return { error: "로그로 저장할 응답 내용이 없습니다." };
+
+  await prisma.logEntry.create({
+    data: {
+      taskId: run.taskId,
+      type: "RESPONSE",
+      content: buildLocalLLMRunConversionContent({ run, body: response }),
+    },
+  });
+
+  revalidateTaskPaths({ projectId: run.task.projectId, taskId: run.taskId });
+  revalidatePath("/search");
+  return { ok: true, message: "Local LLM 응답을 로그로 저장했습니다." };
+}
+
+export async function convertLocalLLMRunToPrompt(formData: FormData) {
+  const id = str(formData.get("id"));
+  const run = await getLocalLLMRunForConversion(id);
+  if (!run) return { error: "Local LLM 실행 기록을 찾을 수 없습니다." };
+  const response = run.response?.trim();
+  if (!response) return { error: "프롬프트로 저장할 응답 내용이 없습니다." };
+
+  await prisma.prompt.create({
+    data: {
+      taskId: run.taskId,
+      targetAI: "Other",
+      isGenerated: true,
+      content: buildLocalLLMRunConversionContent({ run, body: response }),
+    },
+  });
+
+  revalidateTaskPaths({ projectId: run.task.projectId, taskId: run.taskId });
+  revalidatePath("/search");
+  return { ok: true, message: "Local LLM 응답을 프롬프트로 저장했습니다." };
+}
+
+export async function convertLocalLLMRunToErrorLog(formData: FormData) {
+  const id = str(formData.get("id"));
+  const run = await getLocalLLMRunForConversion(id);
+  if (!run) return { error: "Local LLM 실행 기록을 찾을 수 없습니다." };
+  if (run.status !== "ERROR") {
+    return { error: "실패한 Local LLM 실행 기록만 에러 로그로 저장할 수 있습니다." };
+  }
+  const errorMessage = run.errorMessage?.trim() || run.response?.trim();
+  if (!errorMessage) return { error: "에러 로그로 저장할 내용이 없습니다." };
+
+  await prisma.logEntry.create({
+    data: {
+      taskId: run.taskId,
+      type: "ERROR",
+      content: buildLocalLLMRunConversionContent({ run, body: errorMessage }),
+    },
+  });
+
+  revalidateTaskPaths({ projectId: run.task.projectId, taskId: run.taskId });
+  revalidatePath("/search");
+  return { ok: true, message: "Local LLM 실패 기록을 에러 로그로 저장했습니다." };
+}
+
 export async function deleteTask(formData: FormData) {
   const id = str(formData.get("id"));
   if (!id) return;
