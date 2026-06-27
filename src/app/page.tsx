@@ -11,6 +11,7 @@ import { toggleProjectPin } from "@/lib/actions";
 import NewProjectModal from "@/components/NewProjectModal";
 import ProjectImport from "@/components/ProjectImport";
 import LocalProjectSync from "@/components/LocalProjectSync";
+import OllamaStatusPanel from "@/components/OllamaStatusPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -175,6 +176,8 @@ export default async function Dashboard({
           </div>
         </div>
       </form>
+
+      <OllamaStatusPanel />
 
       <ProjectImport />
 

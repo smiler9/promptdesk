@@ -130,15 +130,19 @@ DATABASE_URL="file:./prisma/dev.db"
 LOCAL_FILE_SEARCH_CWD="/Users/lahyunhwa/ai-file-search"
 LOCAL_FILE_SEARCH_PYTHON="/Users/lahyunhwa/ai-file-search/.venv/bin/python"
 LOCAL_FILE_SEARCH_CLI="cli.py"
+OLLAMA_BASE_URL="http://localhost:11434"
 ```
 
-`LOCAL_FILE_SEARCH_*` 값은 홈 화면의 Local Project Sync에서 사용합니다. 앱은 `child_process.execFile`로 `ai-file-search` CLI를 호출하며, 외부 AI API나 Ollama를 호출하지 않습니다.
+`LOCAL_FILE_SEARCH_*` 값은 홈 화면의 Local Project Sync에서 사용합니다. 앱은 `child_process.execFile`로 `ai-file-search` CLI를 호출하며, Local Project Sync 과정에서는 외부 AI API나 Ollama를 호출하지 않습니다.
+
+`OLLAMA_BASE_URL`은 홈 화면의 Ollama Connector에서 사용합니다. 기본값은 `http://localhost:11434`이며, 현재 단계에서는 연결 테스트와 모델 목록 확인만 수행합니다.
 
 | 환경변수 | 설명 |
 | --- | --- |
 | `LOCAL_FILE_SEARCH_CWD` | `ai-file-search` 프로젝트 경로입니다. 기본값은 `/Users/lahyunhwa/ai-file-search`입니다. |
 | `LOCAL_FILE_SEARCH_PYTHON` | `ai-file-search` 가상환경 Python 경로입니다. 기본값은 `/Users/lahyunhwa/ai-file-search/.venv/bin/python`입니다. |
 | `LOCAL_FILE_SEARCH_CLI` | 실행할 CLI 파일입니다. 기본값은 `cli.py`입니다. |
+| `OLLAMA_BASE_URL` | 로컬 Ollama 서버 주소입니다. 기본값은 `http://localhost:11434`입니다. |
 
 3. 의존성을 설치합니다.
 
@@ -321,6 +325,17 @@ cd /Users/lahyunhwa/ai-file-search
 
 `search --json --no-answer`는 ai-file-search 색인이 없으면 `no_index`를 반환합니다.
 PromptDesk는 이 값을 오류 메시지로 표시하며 앱은 중단되지 않습니다. 검색 결과가 필요하면 ai-file-search에서 먼저 색인을 생성합니다.
+
+### Ollama Connector에서 서버 연결 실패가 표시됨
+
+Ollama가 실행 중인지 확인하고, `.env`의 `OLLAMA_BASE_URL` 값이 실제 로컬 서버 주소와 맞는지 확인합니다.
+
+```bash
+OLLAMA_BASE_URL="http://localhost:11434"
+curl http://localhost:11434/api/tags
+```
+
+모델 목록이 비어 있으면 Ollama는 실행 중이지만 설치된 모델이 없는 상태입니다.
 
 ### `better-sqlite3` 설치 경고 또는 빌드 오류
 
