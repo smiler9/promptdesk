@@ -1,0 +1,71 @@
+// PromptDesk — AI 코딩 프로젝트 매니저 MVP
+// SQLite 제약을 고려해 enum 대신 String + 앱 레벨 상수 검증 사용
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  // 진행상태는 Task status 집계로 대시보드에서 산출 (저장하지 않음)
+  tasks       Task[]
+  decisions   Decision[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  // "TODO" | "IN_PROGRESS" | "DONE" | "BLOCKED"
+  status      String     @default("TODO")
+  order       Int        @default(0)
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   String
+  prompts     Prompt[]
+  logs        LogEntry[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Prompt {
+  id          String   @id @default(cuid())
+  content     String
+  // "ChatGPT" | "Claude" | "Codex" | "Claude Code" | "Other"
+  targetAI    String   @default("Claude")
+  // 템플릿 기반 "다음 프롬프트"로 생성된 초안이면 true (기능 9)
+  isGenerated Boolean  @default(false)
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model LogEntry {
+  id        String   @id @default(cuid())
+  // "RESPONSE" | "ERROR" | "NOTE"  — 통합 로그 (확장 시 테이블 추가 불필요)
+  type      String   @default("RESPONSE")
+  content   String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Decision {
+  id        String   @id @default(cuid())
+  title     String
+  content   String?
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

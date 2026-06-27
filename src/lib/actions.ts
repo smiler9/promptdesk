@@ -1,0 +1,228 @@
+"use server";
+
+import { prisma } from "./prisma";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import {
+  TASK_STATUSES,
+  TARGET_AIS,
+  LOG_TYPES,
+  type TaskStatus,
+  type TargetAI,
+  type LogType,
+} from "./constants";
+import { buildTemplatePrompt } from "./nextPrompt";
+
+function str(v: FormDataEntryValue | null): string {
+  return (v ?? "").toString().trim();
+}
+
+/* ---------- Project ---------- */
+
+export async function createProject(formData: FormData) {
+  const name = str(formData.get("name"));
+  if (!name) return;
+  const description = str(formData.get("description")) || null;
+  const p = await prisma.project.create({ data: { name, description } });
+  revalidatePath("/");
+  redirect(`/projects/${p.id}`);
+}
+
+export async function updateProject(formData: FormData) {
+  const id = str(formData.get("id"));
+  const name = str(formData.get("name"));
+  if (!id || !name) return;
+  const description = str(formData.get("description")) || null;
+  await prisma.project.update({ where: { id }, data: { name, description } });
+  revalidatePath("/");
+  revalidatePath(`/projects/${id}`);
+}
+
+export async function deleteProject(formData: FormData) {
+  const id = str(formData.get("id"));
+  if (!id) return;
+  await prisma.project.delete({ where: { id } });
+  revalidatePath("/");
+  redirect("/");
+}
+
+/* ---------- Task ---------- */
+
+export async function createTask(formData: FormData) {
+  const projectId = str(formData.get("projectId"));
+  const title = str(formData.get("title"));
+  if (!projectId || !title) return;
+  const count = await prisma.task.count({ where: { projectId } });
+  await prisma.task.create({
+    data: { projectId, title, order: count },
+  });
+  revalidatePath(`/projects/${projectId}`);
+}
+
+export async function updateTaskStatus(formData: FormData) {
+  const id = str(formData.get("id"));
+  const status = str(formData.get("status")) as TaskStatus;
+  if (!id || !TASK_STATUSES.includes(status)) return;
+  const t = await prisma.task.update({
+    where: { id },
+    data: { status },
+    select: { projectId: true },
+  });
+  revalidatePath(`/projects/${t.projectId}`);
+  revalidatePath(`/tasks/${id}`);
+  revalidatePath("/");
+}
+
+export async function updateTask(formData: FormData) {
+  const id = str(formData.get("id"));
+  const title = str(formData.get("title"));
+  if (!id || !title) return;
+  const description = str(formData.get("description")) || null;
+  const t = await prisma.task.update({
+    where: { id },
+    data: { title, description },
+    select: { projectId: true },
+  });
+  revalidatePath(`/projects/${t.projectId}`);
+  revalidatePath(`/tasks/${id}`);
+}
+
+export async function deleteTask(formData: FormData) {
+  const id = str(formData.get("id"));
+  if (!id) return;
+  const t = await prisma.task.delete({
+    where: { id },
+    select: { projectId: true },
+  });
+  revalidatePath(`/projects/${t.projectId}`);
+  redirect(`/projects/${t.projectId}`);
+}
+
+/* ---------- Prompt ---------- */
+
+export async function createPrompt(formData: FormData) {
+  const taskId = str(formData.get("taskId"));
+  const content = str(formData.get("content"));
+  const targetAI = str(formData.get("targetAI")) as TargetAI;
+  if (!taskId || !content) return;
+  await prisma.prompt.create({
+    data: {
+      taskId,
+      content,
+      targetAI: TARGET_AIS.includes(targetAI) ? targetAI : "Claude",
+    },
+  });
+  revalidatePath(`/tasks/${taskId}`);
+}
+
+export async function updatePrompt(formData: FormData) {
+  const id = str(formData.get("id"));
+  const taskId = str(formData.get("taskId"));
+  const content = str(formData.get("content"));
+  const targetAI = str(formData.get("targetAI")) as TargetAI;
+  if (!id || !content) return;
+  await prisma.prompt.update({
+    where: { id },
+    data: {
+      content,
+      targetAI: TARGET_AIS.includes(targetAI) ? targetAI : "Claude",
+    },
+  });
+  revalidatePath(`/tasks/${taskId}`);
+}
+
+export async function deletePrompt(formData: FormData) {
+  const id = str(formData.get("id"));
+  const taskId = str(formData.get("taskId"));
+  if (!id) return;
+  await prisma.prompt.delete({ where: { id } });
+  revalidatePath(`/tasks/${taskId}`);
+}
+
+/* ---------- LogEntry ---------- */
+
+export async function createLog(formData: FormData) {
+  const taskId = str(formData.get("taskId"));
+  const type = str(formData.get("type")) as LogType;
+  const content = str(formData.get("content"));
+  if (!taskId || !content) return;
+  await prisma.logEntry.create({
+    data: {
+      taskId,
+      type: LOG_TYPES.includes(type) ? type : "NOTE",
+      content,
+    },
+  });
+  revalidatePath(`/tasks/${taskId}`);
+}
+
+export async function updateLog(formData: FormData) {
+  const id = str(formData.get("id"));
+  const taskId = str(formData.get("taskId"));
+  const content = str(formData.get("content"));
+  if (!id || !content) return;
+  await prisma.logEntry.update({ where: { id }, data: { content } });
+  revalidatePath(`/tasks/${taskId}`);
+}
+
+export async function deleteLog(formData: FormData) {
+  const id = str(formData.get("id"));
+  const taskId = str(formData.get("taskId"));
+  if (!id) return;
+  await prisma.logEntry.delete({ where: { id } });
+  revalidatePath(`/tasks/${taskId}`);
+}
+
+/* ---------- Decision ---------- */
+
+export async function createDecision(formData: FormData) {
+  const projectId = str(formData.get("projectId"));
+  const title = str(formData.get("title"));
+  if (!projectId || !title) return;
+  const content = str(formData.get("content")) || null;
+  await prisma.decision.create({ data: { projectId, title, content } });
+  revalidatePath(`/projects/${projectId}`);
+}
+
+export async function deleteDecision(formData: FormData) {
+  const id = str(formData.get("id"));
+  const projectId = str(formData.get("projectId"));
+  if (!id) return;
+  await prisma.decision.delete({ where: { id } });
+  revalidatePath(`/projects/${projectId}`);
+}
+
+/* ---------- 기능 9: 다음 프롬프트 생성 (템플릿 조합) ---------- */
+
+export async function generateNextPrompt(formData: FormData) {
+  const taskId = str(formData.get("taskId"));
+  if (!taskId) return;
+
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    include: {
+      project: { include: { decisions: true } },
+      prompts: { orderBy: { createdAt: "desc" }, take: 1 },
+      logs: { orderBy: { createdAt: "desc" } },
+    },
+  });
+  if (!task) return;
+
+  const draft = buildTemplatePrompt({
+    taskTitle: task.title,
+    lastPrompt: task.prompts[0] ?? null,
+    recentErrors: task.logs.filter((l) => l.type === "ERROR"),
+    recentResponses: task.logs.filter((l) => l.type === "RESPONSE"),
+    decisions: task.project.decisions,
+  });
+
+  await prisma.prompt.create({
+    data: {
+      taskId,
+      content: draft,
+      targetAI: task.prompts[0]?.targetAI ?? "Claude Code",
+      isGenerated: true,
+    },
+  });
+  revalidatePath(`/tasks/${taskId}`);
+}
