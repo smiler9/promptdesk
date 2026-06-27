@@ -4,11 +4,15 @@ PromptDesk는 AI 코딩 작업을 프로젝트, 작업, 프롬프트, 로그, �
 
 ChatGPT, Claude, Codex, Claude Code 등에 전달한 지시문과 작업 결과를 프로젝트별로 보관하고, 어떤 프롬프트와 AI 작업이 어떤 Git 커밋으로 이어졌는지 추적할 수 있습니다.
 
-현재 버전은 `v0.3.0` 개발 중입니다. 인증, 팀 협업, 클라우드 배포, 외부 AI API 직접 연동은 아직 포함하지 않습니다.
+현재 버전은 `v0.3.0`입니다. 인증, 팀 협업, 클라우드 배포, 외부 AI API 직접 연동은 아직 포함하지 않습니다.
 
 ## v0.3.0 변경사항
 
-- Local Project Sync: 홈 화면에서 `ai-file-search`의 JSON CLI를 호출해 로컬 개발 프로젝트를 찾고, PromptDesk Project로 등록하거나 기존 Project의 로컬 경로와 감지 요약을 업데이트합니다.
+- ai-file-search 연동: `/Users/lahyunhwa/ai-file-search`의 JSON CLI를 `child_process.execFile`로 호출해 로컬 프로젝트 후보를 가져옵니다.
+- Local Project Sync: 홈 화면에서 `projects --json` 기반 로컬 프로젝트 목록을 불러오고, `search --json --no-answer`로 검색할 수 있습니다.
+- Project.localPath: PromptDesk Project에 로컬 프로젝트 경로를 저장해 실제 개발 폴더와 연결합니다.
+- Project 등록/업데이트: 검색된 후보를 새 Project로 등록하거나 기존 Project의 `localPath`와 감지 요약을 업데이트합니다.
+- 중복 방지: 같은 `localPath`가 이미 등록되어 있으면 새 Project를 만들지 않고 기존 Project를 업데이트합니다.
 - Export / Import: Project의 `localPath`를 JSON/Markdown 내보내기에 포함하고, 가져오기 시 `localPath`가 없어도 기존 백업 파일을 처리합니다.
 
 ## v0.2.0 변경사항
@@ -38,7 +42,7 @@ ChatGPT, Claude, Codex, Claude Code 등에 전달한 지시문과 작업 결과�
 | Global Search | 프로젝트, 작업, 프롬프트, 로그, 결정사항, 실행 리포트, Git 커밋 기록을 `/search`에서 한 번에 검색합니다. |
 | Pinned Items | 중요한 Project, Task, Prompt Template을 고정하고 대시보드와 목록 상단에서 빠르게 접근합니다. |
 | Project Status Summary | 프로젝트 상세에서 완료율, 상태별 Task 수, 로그/리포트/커밋 수, 최근 활동, 위험 신호를 요약합니다. |
-| Local Project Sync | `ai-file-search`의 `projects --json`, `search --json --no-answer` 결과를 활용해 로컬 개발 프로젝트를 PromptDesk Project와 연결합니다. |
+| Local Project Sync | 홈 화면에서 `ai-file-search`의 `projects --json`, `search --json --no-answer` 결과를 활용해 로컬 개발 프로젝트를 찾고 PromptDesk Project와 연결합니다. |
 
 ## 기술 스택
 
@@ -91,6 +95,7 @@ src/
 
 ```text
 Project
+  ├─ localPath
   ├─ Task
   │   ├─ TaskTag
   │   ├─ TaskChecklistItem
@@ -128,6 +133,12 @@ LOCAL_FILE_SEARCH_CLI="cli.py"
 ```
 
 `LOCAL_FILE_SEARCH_*` 값은 홈 화면의 Local Project Sync에서 사용합니다. 앱은 `child_process.execFile`로 `ai-file-search` CLI를 호출하며, 외부 AI API나 Ollama를 호출하지 않습니다.
+
+| 환경변수 | 설명 |
+| --- | --- |
+| `LOCAL_FILE_SEARCH_CWD` | `ai-file-search` 프로젝트 경로입니다. 기본값은 `/Users/lahyunhwa/ai-file-search`입니다. |
+| `LOCAL_FILE_SEARCH_PYTHON` | `ai-file-search` 가상환경 Python 경로입니다. 기본값은 `/Users/lahyunhwa/ai-file-search/.venv/bin/python`입니다. |
+| `LOCAL_FILE_SEARCH_CLI` | 실행할 CLI 파일입니다. 기본값은 `cli.py`입니다. |
 
 3. 의존성을 설치합니다.
 
@@ -288,6 +299,28 @@ npm run db:push
 ```bash
 npm run db:seed
 ```
+
+### Local Project Sync에서 ai-file-search 실행 파일을 찾을 수 없음
+
+`.env`의 `LOCAL_FILE_SEARCH_*` 값이 실제 경로와 맞는지 확인합니다.
+
+```bash
+LOCAL_FILE_SEARCH_CWD="/Users/lahyunhwa/ai-file-search"
+LOCAL_FILE_SEARCH_PYTHON="/Users/lahyunhwa/ai-file-search/.venv/bin/python"
+LOCAL_FILE_SEARCH_CLI="cli.py"
+```
+
+CLI가 JSON을 출력하는지도 직접 확인할 수 있습니다.
+
+```bash
+cd /Users/lahyunhwa/ai-file-search
+/Users/lahyunhwa/ai-file-search/.venv/bin/python cli.py projects --json
+```
+
+### Local Project Sync 검색에서 `no_index`가 표시됨
+
+`search --json --no-answer`는 ai-file-search 색인이 없으면 `no_index`를 반환합니다.
+PromptDesk는 이 값을 오류 메시지로 표시하며 앱은 중단되지 않습니다. 검색 결과가 필요하면 ai-file-search에서 먼저 색인을 생성합니다.
 
 ### `better-sqlite3` 설치 경고 또는 빌드 오류
 
