@@ -23,6 +23,60 @@ function nullableStr(v: FormDataEntryValue | null): string | null {
   return str(v) || null;
 }
 
+async function resolveGitCommitLinks({
+  projectId,
+  taskId,
+  reportId,
+}: {
+  projectId: string;
+  taskId: string | null;
+  reportId: string | null;
+}) {
+  let resolvedTaskId = taskId;
+  let resolvedReportId = reportId;
+
+  if (resolvedReportId) {
+    const report = await prisma.taskExecutionReport.findUnique({
+      where: { id: resolvedReportId },
+      select: { taskId: true, task: { select: { projectId: true } } },
+    });
+    if (!report || report.task.projectId !== projectId) {
+      resolvedReportId = null;
+    } else {
+      resolvedTaskId = report.taskId;
+    }
+  }
+
+  if (resolvedTaskId) {
+    const task = await prisma.task.findUnique({
+      where: { id: resolvedTaskId },
+      select: { projectId: true },
+    });
+    if (!task || task.projectId !== projectId) {
+      resolvedTaskId = null;
+      resolvedReportId = null;
+    }
+  }
+
+  return { taskId: resolvedTaskId, reportId: resolvedReportId };
+}
+
+function revalidateGitCommitPaths({
+  projectId,
+  taskId,
+  previousTaskId,
+}: {
+  projectId: string;
+  taskId?: string | null;
+  previousTaskId?: string | null;
+}) {
+  revalidatePath(`/projects/${projectId}`);
+  if (taskId) revalidatePath(`/tasks/${taskId}`);
+  if (previousTaskId && previousTaskId !== taskId) {
+    revalidatePath(`/tasks/${previousTaskId}`);
+  }
+}
+
 /* ---------- Project ---------- */
 
 export async function createProject(formData: FormData) {
@@ -282,6 +336,91 @@ export async function deleteTaskExecutionReport(formData: FormData) {
 
   await prisma.taskExecutionReport.delete({ where: { id } });
   revalidatePath(`/tasks/${taskId}`);
+}
+
+/* ---------- GitCommitRecord ---------- */
+
+export async function createGitCommitRecord(formData: FormData) {
+  const projectId = str(formData.get("projectId"));
+  const commitHash = str(formData.get("commitHash"));
+  const commitMessage = str(formData.get("commitMessage"));
+  const branchName = str(formData.get("branchName")) || "main";
+  const remoteUrl = nullableStr(formData.get("remoteUrl"));
+  const links = await resolveGitCommitLinks({
+    projectId,
+    taskId: nullableStr(formData.get("taskId")),
+    reportId: nullableStr(formData.get("reportId")),
+  });
+
+  if (!projectId || !commitHash || !commitMessage) return;
+
+  await prisma.gitCommitRecord.create({
+    data: {
+      projectId,
+      taskId: links.taskId,
+      reportId: links.reportId,
+      commitHash,
+      commitMessage,
+      branchName,
+      remoteUrl,
+      pushedToRemote: formData.get("pushedToRemote") === "on",
+    },
+  });
+
+  revalidateGitCommitPaths({ projectId, taskId: links.taskId });
+}
+
+export async function updateGitCommitRecord(formData: FormData) {
+  const id = str(formData.get("id"));
+  const projectId = str(formData.get("projectId"));
+  const commitHash = str(formData.get("commitHash"));
+  const commitMessage = str(formData.get("commitMessage"));
+  const branchName = str(formData.get("branchName")) || "main";
+  const remoteUrl = nullableStr(formData.get("remoteUrl"));
+  if (!id || !projectId || !commitHash || !commitMessage) return;
+
+  const existing = await prisma.gitCommitRecord.findUnique({
+    where: { id },
+    select: { taskId: true },
+  });
+  const links = await resolveGitCommitLinks({
+    projectId,
+    taskId: nullableStr(formData.get("taskId")),
+    reportId: nullableStr(formData.get("reportId")),
+  });
+
+  await prisma.gitCommitRecord.update({
+    where: { id },
+    data: {
+      taskId: links.taskId,
+      reportId: links.reportId,
+      commitHash,
+      commitMessage,
+      branchName,
+      remoteUrl,
+      pushedToRemote: formData.get("pushedToRemote") === "on",
+    },
+  });
+
+  revalidateGitCommitPaths({
+    projectId,
+    taskId: links.taskId,
+    previousTaskId: existing?.taskId,
+  });
+}
+
+export async function deleteGitCommitRecord(formData: FormData) {
+  const id = str(formData.get("id"));
+  const projectId = str(formData.get("projectId"));
+  if (!id || !projectId) return;
+
+  const existing = await prisma.gitCommitRecord.findUnique({
+    where: { id },
+    select: { taskId: true },
+  });
+  await prisma.gitCommitRecord.delete({ where: { id } });
+
+  revalidateGitCommitPaths({ projectId, taskId: existing?.taskId });
 }
 
 /* ---------- Decision ---------- */

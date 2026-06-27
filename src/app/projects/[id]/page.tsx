@@ -6,6 +6,7 @@ import ProjectHeader from "@/components/ProjectHeader";
 import TaskList from "@/components/TaskList";
 import DecisionPanel from "@/components/DecisionPanel";
 import ProjectTimeline from "@/components/ProjectTimeline";
+import GitCommitRecords from "@/components/GitCommitRecords";
 import { TASK_STATUSES, type TaskStatus } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
@@ -66,6 +67,13 @@ export default async function ProjectPage({
       where: { id },
       include: {
         decisions: { orderBy: { createdAt: "desc" } },
+        gitCommits: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            task: { select: { id: true, title: true } },
+            report: { select: { id: true, summary: true } },
+          },
+        },
         tasks: {
           where: taskFilters.length > 0 ? { AND: taskFilters } : undefined,
           orderBy:
@@ -111,6 +119,7 @@ export default async function ProjectPage({
           select: {
             id: true,
             summary: true,
+            taskId: true,
             buildResult: true,
             testResults: true,
             commitHash: true,
@@ -123,6 +132,13 @@ export default async function ProjectPage({
   ]);
 
   if (!project) notFound();
+  const timelineReports = timelineTasks.flatMap((task) =>
+    task.reports.map((report) => ({
+      id: report.id,
+      taskId: report.taskId,
+      summary: report.summary,
+    }))
+  );
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
@@ -157,10 +173,20 @@ export default async function ProjectPage({
       </div>
 
       <div className="mt-4">
+        <GitCommitRecords
+          projectId={project.id}
+          records={project.gitCommits}
+          tasks={timelineTasks}
+          reports={timelineReports}
+        />
+      </div>
+
+      <div className="mt-4">
         <ProjectTimeline
           projectId={project.id}
           decisions={project.decisions}
           tasks={timelineTasks}
+          gitCommits={project.gitCommits}
           showAll={showAllTimeline}
           currentQuery={currentQuery}
         />

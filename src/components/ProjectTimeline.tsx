@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { LOG_META, STATUS_META, type LogType, type TaskStatus } from "@/lib/constants";
+import {
+  LOG_META,
+  STATUS_META,
+  type LogType,
+  type TaskStatus,
+} from "@/lib/constants";
 
 type TimelineDecision = {
   id: string;
@@ -40,13 +45,24 @@ type TimelineTask = {
 
 type TimelineEvent = {
   id: string;
-  type: "TASK" | "PROMPT" | "LOG" | "DECISION" | "REPORT";
+  type: "TASK" | "PROMPT" | "LOG" | "DECISION" | "REPORT" | "COMMIT";
   badge: string;
   badgeClass: string;
   title: string;
   summary: string;
   date: Date;
   task?: { id: string; title: string };
+};
+
+type TimelineGitCommit = {
+  id: string;
+  taskId: string | null;
+  commitHash: string;
+  commitMessage: string;
+  branchName: string;
+  pushedToRemote: boolean;
+  createdAt: Date;
+  task?: { id: string; title: string } | null;
 };
 
 const EVENT_BADGES: Record<
@@ -58,6 +74,7 @@ const EVENT_BADGES: Record<
   LOG: { label: "Log", cls: "bg-sky-600/80 text-sky-50" },
   DECISION: { label: "Decision", cls: "bg-amber-600/80 text-amber-50" },
   REPORT: { label: "Report", cls: "bg-emerald-600/80 text-emerald-50" },
+  COMMIT: { label: "Commit", cls: "bg-violet-600/80 text-violet-50" },
 };
 
 function excerpt(value: string | null | undefined, length = 180) {
@@ -69,9 +86,11 @@ function excerpt(value: string | null | undefined, length = 180) {
 function buildTimelineEvents({
   decisions,
   tasks,
+  gitCommits,
 }: {
   decisions: TimelineDecision[];
   tasks: TimelineTask[];
+  gitCommits: TimelineGitCommit[];
 }) {
   const events: TimelineEvent[] = [];
 
@@ -158,6 +177,22 @@ function buildTimelineEvents({
     });
   }
 
+  for (const commit of gitCommits) {
+    const pushed = commit.pushedToRemote ? "원격 push 완료" : "로컬 기록";
+    events.push({
+      id: `commit-${commit.id}`,
+      type: "COMMIT",
+      badge: EVENT_BADGES.COMMIT.label,
+      badgeClass: EVENT_BADGES.COMMIT.cls,
+      title: commit.commitMessage,
+      summary: excerpt(
+        `${commit.commitHash.slice(0, 10)} · ${commit.branchName} · ${pushed}`
+      ),
+      date: commit.createdAt,
+      task: commit.task ?? undefined,
+    });
+  }
+
   return events.sort((a, b) => b.date.getTime() - a.date.getTime());
 }
 
@@ -165,16 +200,18 @@ export default function ProjectTimeline({
   projectId,
   decisions,
   tasks,
+  gitCommits,
   showAll,
   currentQuery,
 }: {
   projectId: string;
   decisions: TimelineDecision[];
   tasks: TimelineTask[];
+  gitCommits: TimelineGitCommit[];
   showAll: boolean;
   currentQuery: Record<string, string>;
 }) {
-  const events = buildTimelineEvents({ decisions, tasks });
+  const events = buildTimelineEvents({ decisions, tasks, gitCommits });
   const visibleEvents = showAll ? events : events.slice(0, 20);
   const hasMore = events.length > visibleEvents.length;
   const nextQuery = new URLSearchParams(currentQuery);

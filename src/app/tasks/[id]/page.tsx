@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import TaskHeader from "@/components/TaskHeader";
 import TaskWorkspace from "@/components/TaskWorkspace";
 import TaskExecutionReports from "@/components/TaskExecutionReports";
+import GitCommitRecords from "@/components/GitCommitRecords";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,13 @@ export default async function TaskPage({
         prompts: { orderBy: { createdAt: "desc" } },
         logs: { orderBy: { createdAt: "desc" } },
         reports: { orderBy: { createdAt: "desc" } },
+        gitCommits: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            task: { select: { id: true, title: true } },
+            report: { select: { id: true, summary: true } },
+          },
+        },
       },
     }),
     prisma.promptTemplate.findMany({
@@ -65,6 +73,19 @@ export default async function TaskPage({
 
       <div className="mt-6">
         <TaskExecutionReports taskId={task.id} reports={task.reports} />
+      </div>
+
+      <div className="mt-6">
+        <GitCommitRecords
+          projectId={task.project.id}
+          records={task.gitCommits}
+          reports={task.reports.map((report) => ({
+            id: report.id,
+            taskId: task.id,
+            summary: report.summary,
+          }))}
+          lockedTaskId={task.id}
+        />
       </div>
     </div>
   );

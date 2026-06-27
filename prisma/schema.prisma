@@ -16,6 +16,7 @@ model Project {
   // 진행상태는 Task status 집계로 대시보드에서 산출 (저장하지 않음)
   tasks       Task[]
   decisions   Decision[]
+  gitCommits  GitCommitRecord[]
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 }
@@ -32,6 +33,7 @@ model Task {
   prompts     Prompt[]
   logs        LogEntry[]
   reports     TaskExecutionReport[]
+  gitCommits  GitCommitRecord[]
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 }
@@ -85,10 +87,32 @@ model TaskExecutionReport {
   commitHash     String?
   pushedToRemote Boolean  @default(false)
   nextSteps      String?
+  gitCommits     GitCommitRecord[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   @@index([taskId])
+}
+
+model GitCommitRecord {
+  id             String               @id @default(cuid())
+  project        Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId      String
+  task           Task?                @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  taskId         String?
+  report         TaskExecutionReport? @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  reportId       String?
+  commitHash     String
+  commitMessage  String
+  branchName     String               @default("main")
+  remoteUrl      String?
+  pushedToRemote Boolean              @default(false)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([projectId])
+  @@index([taskId])
+  @@index([reportId])
 }
 
 model Decision {
