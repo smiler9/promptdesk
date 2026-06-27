@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import ProjectHeader from "@/components/ProjectHeader";
 import TaskList from "@/components/TaskList";
 import DecisionPanel from "@/components/DecisionPanel";
+import ProjectTimeline from "@/components/ProjectTimeline";
 import { TASK_STATUSES, type TaskStatus } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,15 @@ type TaskSort = "order" | "updated" | "created";
 
 function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
+function stringQueryParams(params: Record<string, string | string[] | undefined>) {
+  const query: Record<string, string> = {};
+  for (const [key, rawValue] of Object.entries(params)) {
+    const value = firstParam(rawValue).trim();
+    if (value) query[key] = value;
+  }
+  return query;
 }
 
 export default async function ProjectPage({
@@ -35,6 +45,8 @@ export default async function ProjectPage({
   const sortParam = firstParam(queryParams.taskSort);
   const taskSort: TaskSort =
     sortParam === "updated" || sortParam === "created" ? sortParam : "order";
+  const showAllTimeline = firstParam(queryParams.timeline) === "all";
+  const currentQuery = stringQueryParams(queryParams);
 
   const taskFilters: Prisma.TaskWhereInput[] = [];
   if (taskQuery) {
@@ -49,22 +61,66 @@ export default async function ProjectPage({
     taskFilters.push({ status: taskStatus });
   }
 
-  const project = await prisma.project.findUnique({
-    where: { id },
-    include: {
-      decisions: { orderBy: { createdAt: "desc" } },
-      tasks: {
-        where: taskFilters.length > 0 ? { AND: taskFilters } : undefined,
-        orderBy:
-          taskSort === "updated"
-            ? { updatedAt: "desc" }
-            : taskSort === "created"
-                ? { createdAt: "desc" }
-                : { order: "asc" },
-        include: { _count: { select: { prompts: true, logs: true } } },
+  const [project, timelineTasks] = await Promise.all([
+    prisma.project.findUnique({
+      where: { id },
+      include: {
+        decisions: { orderBy: { createdAt: "desc" } },
+        tasks: {
+          where: taskFilters.length > 0 ? { AND: taskFilters } : undefined,
+          orderBy:
+            taskSort === "updated"
+              ? { updatedAt: "desc" }
+              : taskSort === "created"
+                  ? { createdAt: "desc" }
+                  : { order: "asc" },
+          include: { _count: { select: { prompts: true, logs: true } } },
+        },
       },
-    },
-  });
+    }),
+    prisma.task.findMany({
+      where: { projectId: id },
+      orderBy: { updatedAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        prompts: {
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            content: true,
+            targetAI: true,
+            isGenerated: true,
+            createdAt: true,
+          },
+        },
+        logs: {
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            type: true,
+            content: true,
+            createdAt: true,
+          },
+        },
+        reports: {
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            summary: true,
+            buildResult: true,
+            testResults: true,
+            commitHash: true,
+            pushedToRemote: true,
+            createdAt: true,
+          },
+        },
+      },
+    }),
+  ]);
 
   if (!project) notFound();
 
@@ -98,6 +154,16 @@ export default async function ProjectPage({
             decisions={project.decisions}
           />
         </div>
+      </div>
+
+      <div className="mt-4">
+        <ProjectTimeline
+          projectId={project.id}
+          decisions={project.decisions}
+          tasks={timelineTasks}
+          showAll={showAllTimeline}
+          currentQuery={currentQuery}
+        />
       </div>
     </div>
   );
