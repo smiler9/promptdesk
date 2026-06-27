@@ -7,6 +7,7 @@ import TaskList from "@/components/TaskList";
 import DecisionPanel from "@/components/DecisionPanel";
 import ProjectTimeline from "@/components/ProjectTimeline";
 import GitCommitRecords from "@/components/GitCommitRecords";
+import ProjectExport from "@/components/ProjectExport";
 import { TASK_STATUSES, type TaskStatus } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
@@ -91,8 +92,11 @@ export default async function ProjectPage({
       orderBy: { updatedAt: "desc" },
       select: {
         id: true,
+        projectId: true,
         title: true,
+        description: true,
         status: true,
+        order: true,
         createdAt: true,
         updatedAt: true,
         prompts: {
@@ -103,6 +107,7 @@ export default async function ProjectPage({
             targetAI: true,
             isGenerated: true,
             createdAt: true,
+            updatedAt: true,
           },
         },
         logs: {
@@ -112,6 +117,7 @@ export default async function ProjectPage({
             type: true,
             content: true,
             createdAt: true,
+            updatedAt: true,
           },
         },
         reports: {
@@ -120,11 +126,31 @@ export default async function ProjectPage({
             id: true,
             summary: true,
             taskId: true,
+            changedFiles: true,
+            commandsRun: true,
             buildResult: true,
             testResults: true,
             commitHash: true,
             pushedToRemote: true,
+            nextSteps: true,
             createdAt: true,
+            updatedAt: true,
+          },
+        },
+        gitCommits: {
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            projectId: true,
+            taskId: true,
+            reportId: true,
+            commitHash: true,
+            commitMessage: true,
+            branchName: true,
+            remoteUrl: true,
+            pushedToRemote: true,
+            createdAt: true,
+            updatedAt: true,
           },
         },
       },
@@ -151,6 +177,15 @@ export default async function ProjectPage({
           id={project.id}
           name={project.name}
           description={project.description}
+        />
+      </div>
+
+      <div className="mt-4">
+        <ProjectExport
+          project={project}
+          tasks={timelineTasks}
+          decisions={project.decisions}
+          gitCommits={project.gitCommits}
         />
       </div>
 
