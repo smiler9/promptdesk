@@ -19,6 +19,10 @@ function str(v: FormDataEntryValue | null): string {
   return (v ?? "").toString().trim();
 }
 
+function nullableStr(v: FormDataEntryValue | null): string | null {
+  return str(v) || null;
+}
+
 /* ---------- Project ---------- */
 
 export async function createProject(formData: FormData) {
@@ -223,6 +227,60 @@ export async function deleteLog(formData: FormData) {
   const taskId = str(formData.get("taskId"));
   if (!id) return;
   await prisma.logEntry.delete({ where: { id } });
+  revalidatePath(`/tasks/${taskId}`);
+}
+
+/* ---------- TaskExecutionReport ---------- */
+
+export async function createTaskExecutionReport(formData: FormData) {
+  const taskId = str(formData.get("taskId"));
+  const summary = str(formData.get("summary"));
+  if (!taskId || !summary) return;
+
+  await prisma.taskExecutionReport.create({
+    data: {
+      taskId,
+      summary,
+      changedFiles: nullableStr(formData.get("changedFiles")),
+      commandsRun: nullableStr(formData.get("commandsRun")),
+      testResults: nullableStr(formData.get("testResults")),
+      buildResult: nullableStr(formData.get("buildResult")),
+      commitHash: nullableStr(formData.get("commitHash")),
+      pushedToRemote: formData.get("pushedToRemote") === "on",
+      nextSteps: nullableStr(formData.get("nextSteps")),
+    },
+  });
+  revalidatePath(`/tasks/${taskId}`);
+}
+
+export async function updateTaskExecutionReport(formData: FormData) {
+  const id = str(formData.get("id"));
+  const taskId = str(formData.get("taskId"));
+  const summary = str(formData.get("summary"));
+  if (!id || !taskId || !summary) return;
+
+  await prisma.taskExecutionReport.update({
+    where: { id },
+    data: {
+      summary,
+      changedFiles: nullableStr(formData.get("changedFiles")),
+      commandsRun: nullableStr(formData.get("commandsRun")),
+      testResults: nullableStr(formData.get("testResults")),
+      buildResult: nullableStr(formData.get("buildResult")),
+      commitHash: nullableStr(formData.get("commitHash")),
+      pushedToRemote: formData.get("pushedToRemote") === "on",
+      nextSteps: nullableStr(formData.get("nextSteps")),
+    },
+  });
+  revalidatePath(`/tasks/${taskId}`);
+}
+
+export async function deleteTaskExecutionReport(formData: FormData) {
+  const id = str(formData.get("id"));
+  const taskId = str(formData.get("taskId"));
+  if (!id || !taskId) return;
+
+  await prisma.taskExecutionReport.delete({ where: { id } });
   revalidatePath(`/tasks/${taskId}`);
 }
 

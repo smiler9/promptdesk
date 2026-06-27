@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import TaskHeader from "@/components/TaskHeader";
 import TaskWorkspace from "@/components/TaskWorkspace";
+import TaskExecutionReports from "@/components/TaskExecutionReports";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export default async function TaskPage({
         project: { select: { id: true, name: true } },
         prompts: { orderBy: { createdAt: "desc" } },
         logs: { orderBy: { createdAt: "desc" } },
+        reports: { orderBy: { createdAt: "desc" } },
       },
     }),
     prisma.promptTemplate.findMany({
@@ -59,6 +61,10 @@ export default async function TaskPage({
           logs={task.logs}
           templates={templates}
         />
+      </div>
+
+      <div className="mt-6">
+        <TaskExecutionReports taskId={task.id} reports={task.reports} />
       </div>
     </div>
   );
