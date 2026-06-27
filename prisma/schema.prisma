@@ -38,6 +38,7 @@ model Task {
   prompts     Prompt[]
   logs        LogEntry[]
   reports     TaskExecutionReport[]
+  localLLMRuns LocalLLMRun[]
   gitCommits  GitCommitRecord[]
   tags        TaskTag[]
   checklistItems TaskChecklistItem[]
@@ -124,6 +125,23 @@ model TaskExecutionReport {
   gitCommits     GitCommitRecord[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  @@index([taskId])
+}
+
+model LocalLLMRun {
+  id           String   @id @default(cuid())
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId       String
+  model        String
+  prompt       String
+  response     String?
+  // "SUCCESS" | "ERROR"
+  status       String   @default("SUCCESS")
+  errorMessage String?
+  durationMs   Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@index([taskId])
 }

@@ -8,7 +8,15 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 type SearchResult = {
   id: string;
-  type: "Project" | "Task" | "Prompt" | "Log" | "Decision" | "Report" | "Commit";
+  type:
+    | "Project"
+    | "Task"
+    | "Prompt"
+    | "Log"
+    | "Decision"
+    | "Report"
+    | "Local LLM"
+    | "Commit";
   href: string;
   title: string;
   summary: string;
@@ -28,6 +36,7 @@ const TYPE_META: Record<SearchResult["type"], { label: string; cls: string }> = 
   Log: { label: "Log", cls: "bg-sky-600/80 text-sky-50" },
   Decision: { label: "Decision", cls: "bg-amber-600/80 text-amber-50" },
   Report: { label: "Report", cls: "bg-emerald-600/80 text-emerald-50" },
+  "Local LLM": { label: "Local LLM", cls: "bg-teal-600/80 text-teal-50" },
   Commit: { label: "Commit", cls: "bg-violet-600/80 text-violet-50" },
 };
 
@@ -56,6 +65,7 @@ async function runGlobalSearch(query: string) {
     logs,
     decisions,
     reports,
+    localLLMRuns,
     gitCommits,
   ] = await Promise.all([
     prisma.project.findMany({
@@ -140,6 +150,27 @@ async function runGlobalSearch(query: string) {
           { buildResult: { contains: query } },
           { commitHash: { contains: query } },
           { nextSteps: { contains: query } },
+        ],
+      },
+      include: {
+        task: {
+          select: {
+            id: true,
+            title: true,
+            project: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 30,
+    }),
+    prisma.localLLMRun.findMany({
+      where: {
+        OR: [
+          { model: { contains: query } },
+          { prompt: { contains: query } },
+          { response: { contains: query } },
+          { errorMessage: { contains: query } },
         ],
       },
       include: {
@@ -253,6 +284,25 @@ async function runGlobalSearch(query: string) {
       createdAt: report.createdAt,
       updatedAt: report.updatedAt,
     })),
+    ...localLLMRuns.map((run) => ({
+      id: run.id,
+      type: "Local LLM" as const,
+      href: `/tasks/${run.task.id}`,
+      title: `${run.model} · ${run.status}`,
+      summary: excerpt(
+        [
+          run.prompt,
+          run.response,
+          run.errorMessage,
+        ]
+          .filter(Boolean)
+          .join("\n")
+      ),
+      projectName: run.task.project.name,
+      taskName: run.task.title,
+      createdAt: run.createdAt,
+      updatedAt: run.updatedAt,
+    })),
     ...gitCommits.map((commit) => ({
       id: commit.id,
       type: "Commit" as const,
@@ -291,7 +341,7 @@ export default async function SearchPage({
         <div>
           <h1 className="text-2xl font-semibold">전체 검색</h1>
           <p className="text-sm text-slate-500 mt-1">
-            프로젝트, 작업, 프롬프트, 로그, 결정사항, 실행 리포트, Git 커밋 기록 검색
+            프로젝트, 작업, 프롬프트, 로그, 결정사항, 실행 리포트, Local LLM, Git 커밋 기록 검색
           </p>
         </div>
         <Link
@@ -335,7 +385,7 @@ export default async function SearchPage({
             검색어를 입력하면 전체 개발 기록에서 관련 항목을 찾습니다.
           </div>
           <p className="text-sm text-slate-500 mt-2">
-            현재 스키마에 저장된 프로젝트 설명, 작업 설명, 프롬프트, 로그, 결정사항, 리포트, 커밋 기록을 함께 검색합니다.
+            현재 스키마에 저장된 프로젝트 설명, 작업 설명, 프롬프트, 로그, 결정사항, 리포트, Local LLM 실행 기록, 커밋 기록을 함께 검색합니다.
           </p>
         </div>
       ) : results.length === 0 ? (

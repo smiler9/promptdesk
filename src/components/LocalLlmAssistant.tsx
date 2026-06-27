@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import CopyButton from "./CopyButton";
 import {
   loadOllamaModels,
   runOllamaGenerate,
 } from "@/lib/ollamaActions";
+import { createLocalLLMRun } from "@/lib/actions";
 import type { OllamaModel } from "@/lib/ollama";
 import { buildTemplatePrompt } from "@/lib/nextPrompt";
 
@@ -70,6 +72,7 @@ function formatDuration(ns: number | undefined) {
 }
 
 export default function LocalLlmAssistant({
+  taskId,
   projectName,
   title,
   description,
@@ -82,6 +85,7 @@ export default function LocalLlmAssistant({
   checklistItems,
   gitCommits,
 }: {
+  taskId: string;
   projectName: string;
   title: string;
   description: string | null;
@@ -94,14 +98,18 @@ export default function LocalLlmAssistant({
   checklistItems: ChecklistSummary[];
   gitCommits: GitCommitSummary[];
 }) {
+  const router = useRouter();
   const [models, setModels] = useState<OllamaModel[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [prompt, setPrompt] = useState("");
   const [response, setResponse] = useState("");
   const [responseModel, setResponseModel] = useState("");
   const [responseDuration, setResponseDuration] = useState<string | null>(null);
+  const [durationMs, setDurationMs] = useState<number | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [lastErrorMessage, setLastErrorMessage] = useState<string | null>(null);
   const [ok, setOk] = useState<boolean | null>(null);
+  const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState<"models" | "run" | null>(null);
 
   const generatedNextPrompt = useMemo(
@@ -160,7 +168,10 @@ export default function LocalLlmAssistant({
     setResponse("");
     setResponseModel("");
     setResponseDuration(null);
+    setDurationMs(null);
     setMessage(null);
+    setLastErrorMessage(null);
+    setSaved(false);
     const result = await runOllamaGenerate({
       model: selectedModel,
       prompt,
@@ -171,8 +182,35 @@ export default function LocalLlmAssistant({
       setResponse(result.data.response);
       setResponseModel(result.data.model);
       setResponseDuration(formatDuration(result.data.total_duration));
+      setDurationMs(
+        result.data.total_duration
+          ? Math.round(result.data.total_duration / 1_000_000)
+          : null
+      );
+    } else if (!result.ok) {
+      setLastErrorMessage(result.message);
     }
     setLoading(null);
+  }
+
+  async function saveRun() {
+    const formData = new FormData();
+    formData.set("taskId", taskId);
+    formData.set("model", responseModel || selectedModel);
+    formData.set("prompt", prompt);
+    formData.set("response", response);
+    formData.set("status", ok ? "SUCCESS" : "ERROR");
+    if (lastErrorMessage) formData.set("errorMessage", lastErrorMessage);
+    if (durationMs !== null) formData.set("durationMs", String(durationMs));
+    const result = await createLocalLLMRun(formData);
+    if (result?.error) {
+      setOk(false);
+      setMessage(result.error);
+      return;
+    }
+    setSaved(true);
+    setMessage("Local LLM 실행 기록을 저장했습니다.");
+    router.refresh();
   }
 
   return (
@@ -235,6 +273,16 @@ export default function LocalLlmAssistant({
         >
           {loading === "run" ? "실행 중..." : "Run Local LLM"}
         </button>
+        {(response || lastErrorMessage) && (
+          <button
+            type="button"
+            onClick={saveRun}
+            disabled={saved || !selectedModel || !prompt.trim()}
+            className="text-xs px-3 py-1.5 rounded-md border border-emerald-700/60 text-emerald-200 hover:bg-emerald-900/30 disabled:opacity-60"
+          >
+            {saved ? "저장됨" : "실행 기록 저장"}
+          </button>
+        )}
         {prompt && <CopyButton text={prompt} label="프롬프트 복사" />}
       </div>
 

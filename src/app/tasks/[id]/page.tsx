@@ -6,6 +6,7 @@ import TaskWorkspace from "@/components/TaskWorkspace";
 import TaskChecklist from "@/components/TaskChecklist";
 import NextAiPrompt from "@/components/NextAiPrompt";
 import LocalLlmAssistant from "@/components/LocalLlmAssistant";
+import LocalLlmRuns from "@/components/LocalLlmRuns";
 import TaskExecutionReports from "@/components/TaskExecutionReports";
 import GitCommitRecords from "@/components/GitCommitRecords";
 
@@ -29,6 +30,7 @@ export default async function TaskPage({
         prompts: { orderBy: { createdAt: "desc" } },
         logs: { orderBy: { createdAt: "desc" } },
         reports: { orderBy: { createdAt: "desc" } },
+        localLLMRuns: { orderBy: { createdAt: "desc" } },
         gitCommits: {
           orderBy: { createdAt: "desc" },
           include: {
@@ -94,6 +96,7 @@ export default async function TaskPage({
 
       <div className="mt-6">
         <LocalLlmAssistant
+          taskId={task.id}
           projectName={task.project.name}
           title={task.title}
           description={task.description}
@@ -106,6 +109,10 @@ export default async function TaskPage({
           checklistItems={task.checklistItems}
           gitCommits={task.gitCommits}
         />
+      </div>
+
+      <div className="mt-6">
+        <LocalLlmRuns runs={task.localLLMRuns} />
       </div>
 
       <div className="mt-6">

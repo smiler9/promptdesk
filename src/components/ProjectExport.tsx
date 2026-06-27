@@ -79,6 +79,19 @@ type ExportReport = {
   updatedAt: Timestamp;
 };
 
+type ExportLocalLLMRun = {
+  id: string;
+  taskId: string;
+  model: string;
+  prompt: string;
+  response: string | null;
+  status: string;
+  errorMessage: string | null;
+  durationMs: number | null;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};
+
 type ExportGitCommit = {
   id: string;
   projectId: string;
@@ -111,6 +124,7 @@ type ExportTask = {
   prompts: ExportPrompt[];
   logs: ExportLog[];
   reports: ExportReport[];
+  localLLMRuns: ExportLocalLLMRun[];
   gitCommits: ExportGitCommit[];
 };
 
@@ -309,6 +323,11 @@ function buildJsonExport({
         createdAt: toIso(report.createdAt),
         updatedAt: toIso(report.updatedAt),
       })),
+      localLLMRuns: task.localLLMRuns.map((run) => ({
+        ...run,
+        createdAt: toIso(run.createdAt),
+        updatedAt: toIso(run.updatedAt),
+      })),
       gitCommits: task.gitCommits.map((commit) => ({
         ...commit,
         createdAt: toIso(commit.createdAt),
@@ -460,6 +479,30 @@ function buildMarkdownExport({
           lines.push(codeBlock(report.buildResult));
           lines.push("Next Steps");
           lines.push(codeBlock(report.nextSteps));
+          lines.push("");
+        }
+      }
+
+      lines.push("#### Local LLM Runs");
+      lines.push("");
+      if (task.localLLMRuns.length === 0) {
+        lines.push("_저장된 Local LLM 실행 기록이 없습니다._");
+      } else {
+        for (const run of task.localLLMRuns) {
+          lines.push(`##### ${formatDate(run.createdAt)} · ${run.model}`);
+          lines.push("");
+          lines.push(`- Status: ${run.status}`);
+          lines.push(`- Duration: ${run.durationMs ?? "없음"}ms`);
+          lines.push("");
+          lines.push("Prompt");
+          lines.push(codeBlock(run.prompt));
+          if (run.status === "SUCCESS") {
+            lines.push("Response");
+            lines.push(codeBlock(run.response));
+          } else {
+            lines.push("Error");
+            lines.push(codeBlock(run.errorMessage));
+          }
           lines.push("");
         }
       }

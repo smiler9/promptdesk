@@ -182,6 +182,21 @@ export default async function ProjectPage({
             updatedAt: true,
           },
         },
+        localLLMRuns: {
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            taskId: true,
+            model: true,
+            prompt: true,
+            response: true,
+            status: true,
+            errorMessage: true,
+            durationMs: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
         gitCommits: {
           orderBy: { createdAt: "desc" },
           select: {

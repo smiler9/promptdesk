@@ -27,6 +27,11 @@ type SummaryReport = {
   createdAt: Date;
 };
 
+type SummaryLocalLLMRun = {
+  id: string;
+  status: string;
+};
+
 type SummaryChecklistItem = {
   id: string;
   isDone: boolean;
@@ -43,6 +48,7 @@ type SummaryTask = {
   prompts: SummaryPrompt[];
   logs: SummaryLog[];
   reports: SummaryReport[];
+  localLLMRuns: SummaryLocalLLMRun[];
   checklistItems: SummaryChecklistItem[];
 };
 
@@ -98,6 +104,9 @@ function buildMarkdown({
   errorLogCount,
   decisionCount,
   reportCount,
+  localLLMRunCount,
+  localLLMSuccessCount,
+  localLLMErrorCount,
   commitCount,
   pinnedTaskCount,
   priorityCounts,
@@ -121,6 +130,9 @@ function buildMarkdown({
   errorLogCount: number;
   decisionCount: number;
   reportCount: number;
+  localLLMRunCount: number;
+  localLLMSuccessCount: number;
+  localLLMErrorCount: number;
   commitCount: number;
   pinnedTaskCount: number;
   priorityCounts: Record<TaskPriority, number>;
@@ -149,6 +161,9 @@ function buildMarkdown({
   lines.push(markdownLine("에러 로그", errorLogCount));
   lines.push(markdownLine("결정사항", decisionCount));
   lines.push(markdownLine("실행 리포트", reportCount));
+  lines.push(markdownLine("Local LLM 실행", localLLMRunCount));
+  lines.push(markdownLine("Local LLM 성공", localLLMSuccessCount));
+  lines.push(markdownLine("Local LLM 실패", localLLMErrorCount));
   lines.push(markdownLine("Git 커밋 기록", commitCount));
   lines.push(markdownLine("고정 Task", pinnedTaskCount));
   lines.push(markdownLine("체크리스트 전체", checklistTotal));
@@ -271,6 +286,14 @@ export default function ProjectStatusSummary({
   const logCount = logs.length;
   const errorLogCount = logs.filter((log) => log.type === "ERROR").length;
   const reportCount = reports.length;
+  const localLLMRuns = tasks.flatMap((task) => task.localLLMRuns);
+  const localLLMRunCount = localLLMRuns.length;
+  const localLLMSuccessCount = localLLMRuns.filter(
+    (run) => run.status === "SUCCESS"
+  ).length;
+  const localLLMErrorCount = localLLMRuns.filter(
+    (run) => run.status === "ERROR"
+  ).length;
   const commitCount = gitCommits.length;
   const pinnedTaskCount = tasks.filter((task) => task.isPinned).length;
   const checklistItems = tasks.flatMap((task) => task.checklistItems);
@@ -305,6 +328,9 @@ export default function ProjectStatusSummary({
     errorLogCount,
     decisionCount,
     reportCount,
+    localLLMRunCount,
+    localLLMSuccessCount,
+    localLLMErrorCount,
     commitCount,
     pinnedTaskCount,
     priorityCounts,
@@ -328,6 +354,9 @@ export default function ProjectStatusSummary({
     { label: "에러 로그", value: errorLogCount },
     { label: "결정사항", value: decisionCount },
     { label: "실행 리포트", value: reportCount },
+    { label: "Local LLM", value: localLLMRunCount },
+    { label: "LLM 성공", value: localLLMSuccessCount },
+    { label: "LLM 실패", value: localLLMErrorCount },
     { label: "Git 커밋", value: commitCount },
     { label: "고정 Task", value: pinnedTaskCount },
     { label: "HIGH/URGENT", value: highUrgentTaskCount },

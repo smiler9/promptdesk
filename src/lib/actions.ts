@@ -370,6 +370,30 @@ export async function importProjectFromJson(formData: FormData) {
             reportTaskIdMap.set(oldReportId, createdTask.id);
           }
         }
+
+        for (const run of arrayField(task.localLLMRuns)) {
+          const model = stringField(run.model);
+          const prompt = stringField(run.prompt);
+          if (!model || !prompt) continue;
+          const status = stringField(run.status) === "ERROR" ? "ERROR" : "SUCCESS";
+          const durationMs =
+            typeof run.durationMs === "number" && Number.isInteger(run.durationMs)
+              ? run.durationMs
+              : undefined;
+          await tx.localLLMRun.create({
+            data: {
+              taskId: createdTask.id,
+              model,
+              prompt,
+              response: nullableStringField(run.response),
+              status,
+              errorMessage: nullableStringField(run.errorMessage),
+              durationMs,
+              createdAt: dateField(run.createdAt),
+              updatedAt: dateField(run.updatedAt),
+            },
+          });
+        }
       }
 
       const commitInputs = new Map<string, Record<string, unknown>>();
@@ -618,6 +642,43 @@ export async function deleteTaskChecklistItem(formData: FormData) {
 
   await prisma.taskChecklistItem.delete({ where: { id } });
   revalidateTaskPaths({ projectId: item.task.projectId, taskId: item.taskId });
+}
+
+export async function createLocalLLMRun(formData: FormData) {
+  const taskId = str(formData.get("taskId"));
+  const model = str(formData.get("model"));
+  const prompt = str(formData.get("prompt"));
+  const response = nullableStr(formData.get("response"));
+  const status = str(formData.get("status")) === "ERROR" ? "ERROR" : "SUCCESS";
+  const errorMessage = nullableStr(formData.get("errorMessage"));
+  const durationValue = Number(str(formData.get("durationMs")));
+  const durationMs = Number.isFinite(durationValue)
+    ? Math.max(0, Math.round(durationValue))
+    : null;
+  if (!taskId || !model || !prompt) {
+    return { error: "저장할 Local LLM 실행 정보가 부족합니다." };
+  }
+
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { projectId: true },
+  });
+  if (!task) return { error: "Task를 찾을 수 없습니다." };
+
+  await prisma.localLLMRun.create({
+    data: {
+      taskId,
+      model,
+      prompt,
+      response,
+      status,
+      errorMessage,
+      durationMs,
+    },
+  });
+  revalidateTaskPaths({ projectId: task.projectId, taskId });
+  revalidatePath("/search");
+  return { ok: true };
 }
 
 export async function deleteTask(formData: FormData) {
