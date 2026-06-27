@@ -43,6 +43,12 @@ export default async function RootLayout({
                 ▤ 대시보드
               </Link>
               <Link
+                href="/search"
+                className="block px-3 py-2 rounded-md text-sm text-slate-300 hover:bg-slate-800/60"
+              >
+                ⌕ 전체 검색
+              </Link>
+              <Link
                 href="/templates"
                 className="block px-3 py-2 rounded-md text-sm text-slate-300 hover:bg-slate-800/60"
               >
