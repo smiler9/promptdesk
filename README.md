@@ -4,7 +4,14 @@ PromptDesk는 AI 코딩 작업을 프로젝트, 작업, 프롬프트, 로그, �
 
 ChatGPT, Claude, Codex, Claude Code 등에 전달한 지시문과 작업 결과를 프로젝트별로 보관하고, 어떤 프롬프트와 AI 작업이 어떤 Git 커밋으로 이어졌는지 추적할 수 있습니다.
 
-현재 버전은 `v0.1.0`입니다. 인증, 팀 협업, 클라우드 배포, 외부 AI API 직접 연동은 아직 포함하지 않습니다.
+현재 버전은 `v0.2.0`입니다. 인증, 팀 협업, 클라우드 배포, 외부 AI API 직접 연동은 아직 포함하지 않습니다.
+
+## v0.2.0 변경사항
+
+- Task Priority: `LOW`, `MEDIUM`, `HIGH`, `URGENT` 우선순위를 Task별로 관리합니다.
+- Task Tags: Task에 `bug`, `feature`, `frontend` 같은 태그와 선택 색상을 붙여 분류합니다.
+- Task Checklist: Task 안에서 세부 작업을 체크리스트로 추가, 수정, 완료 처리, 삭제할 수 있습니다.
+- Next AI Prompt 개선: Task 상태, priority, tags, prompts, logs, error logs, execution reports, checklist, Git commit records를 바탕으로 Codex 또는 Claude Code용 다음 작업 프롬프트를 로컬 템플릿으로 생성합니다.
 
 ## 현재 구현 기능
 
@@ -12,7 +19,11 @@ ChatGPT, Claude, Codex, Claude Code 등에 전달한 지시문과 작업 결과�
 | --- | --- |
 | Project 관리 | 프로젝트 생성, 수정, 삭제, 설명 기록, 대시보드 목록 표시를 지원합니다. |
 | Task 관리 | 프로젝트별 Task 생성, 수정, 삭제와 `TODO`, `IN_PROGRESS`, `DONE`, `BLOCKED` 상태 관리를 지원합니다. |
+| Task Priority | Task별 `LOW`, `MEDIUM`, `HIGH`, `URGENT` 우선순위를 관리하고 목록/검색/요약에 표시합니다. |
+| Task Tags | Task별 태그와 색상을 관리하고 Task 목록과 전체 검색 결과에 표시합니다. |
+| Task Checklist | Task 상세에서 체크리스트 항목을 추가, 완료 토글, 수정, 삭제하고 Task 목록과 프로젝트 요약에 진행률을 표시합니다. |
 | Prompt 저장 | Task별로 AI에게 보낸 프롬프트와 대상 AI를 저장합니다. |
+| Next AI Prompt | Task 컨텍스트를 바탕으로 Codex/Claude Code용 다음 작업 프롬프트를 생성하고 복사하거나 Prompt로 저장합니다. |
 | LogEntry 관리 | AI 응답, 에러, 메모를 Task별 로그로 저장하고 필터링합니다. |
 | Prompt Template | 자주 쓰는 AI 코딩 지시문을 템플릿으로 만들고, Task 프롬프트 작성 시 불러옵니다. |
 | Execution Report | AI 작업 완료 후 변경 파일, 실행 명령, 테스트 결과, 빌드 결과, 커밋 해시, 후속 작업을 구조화해서 저장합니다. |
@@ -41,8 +52,8 @@ ChatGPT, Claude, Codex, Claude Code 등에 전달한 지시문과 작업 결과�
 | --- | --- |
 | `/` | 대시보드, 프로젝트 검색/필터, 고정 항목, 프로젝트 카드 목록 |
 | `/?new=1` | 새 프로젝트 생성 모달 |
-| `/projects/[id]` | 프로젝트 상세, 상태 요약, Export, Task 목록, Decision, Git Commit, Timeline |
-| `/tasks/[id]` | Task 상세, Prompt/Log 관리, 템플릿 불러오기, 실행 리포트, Git Commit 연결 |
+| `/projects/[id]` | 프로젝트 상세, 상태 요약, Export, Task 검색/상태/우선순위 필터, Decision, Git Commit, Timeline |
+| `/tasks/[id]` | Task 상세, priority/tags/checklist 관리, Next AI Prompt, Prompt/Log 관리, 템플릿 불러오기, 실행 리포트, Git Commit 연결 |
 | `/templates` | Prompt Template 목록, 생성, 수정, 삭제, 고정 |
 | `/search?q=검색어` | 전체 검색 |
 
@@ -74,6 +85,8 @@ src/
 ```text
 Project
   ├─ Task
+  │   ├─ TaskTag
+  │   ├─ TaskChecklistItem
   │   ├─ Prompt
   │   ├─ LogEntry
   │   ├─ TaskExecutionReport
@@ -84,7 +97,7 @@ Project
 PromptTemplate
 ```
 
-SQLite enum 제약을 피하기 위해 `targetAI`, `status`, `type`, `category`는 Prisma enum이 아니라 `String`으로 저장합니다.
+SQLite enum 제약을 피하기 위해 `targetAI`, `status`, `priority`, `type`, `category`는 Prisma enum이 아니라 `String`으로 저장합니다.
 허용 값 검증은 [src/lib/constants.ts](src/lib/constants.ts)와 Server Actions에서 처리합니다.
 
 ## 설치 방법
@@ -125,6 +138,13 @@ SQLite DB 생성과 스키마 반영:
 
 ```bash
 npm run db:push
+```
+
+Prisma 스키마 변경 후 로컬 DB와 Prisma Client를 명시적으로 동기화할 때는 다음 명령을 사용합니다.
+
+```bash
+npx prisma generate
+npx prisma db push
 ```
 
 예시 프로젝트와 기본 템플릿 생성:
@@ -191,6 +211,8 @@ npm run dev
 | `npm run db:seed` | 예시 데이터와 기본 템플릿을 생성합니다. |
 | `npm run db:studio` | Prisma Studio를 실행합니다. |
 | `npm run postinstall` | Prisma Client를 생성합니다. 일반적으로 `npm install` 후 자동 실행됩니다. |
+| `npx prisma generate` | Prisma Client를 수동 생성합니다. |
+| `npx prisma db push` | 현재 Prisma 스키마를 SQLite DB에 직접 반영합니다. |
 
 ## GitHub 백업 상태
 
@@ -207,6 +229,7 @@ branch  main
 
 - Task 순서 변경 UI 추가
 - Decision 수정 기능 추가
+- Next AI Prompt 템플릿 세부 옵션 추가
 - Prompt/Log 긴 내용 보기 UX 개선
 - 템플릿 카테고리별 필터와 검색 강화
 - Export/Import 검증 메시지 개선

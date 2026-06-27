@@ -200,7 +200,7 @@ export default function NextAiPrompt({
             className="hidden"
           />
           <button className="text-xs px-2 py-1 rounded border border-amber-700/60 text-amber-200 hover:bg-amber-900/30">
-            Prompt로 저장
+            프롬프트로 저장
           </button>
         </form>
         {saved && (
