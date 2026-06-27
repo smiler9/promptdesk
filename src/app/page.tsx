@@ -24,10 +24,29 @@ function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
 }
 
-function progress(tasks: { status: string }[]) {
-  if (tasks.length === 0) return 0;
+function projectProgress(tasks: { status: string }[]) {
+  if (tasks.length === 0) {
+    return {
+      percent: null,
+      label: "Task 없음",
+      helper: "Not started",
+    };
+  }
   const done = tasks.filter((t) => t.status === "DONE").length;
-  return Math.round((done / tasks.length) * 100);
+  const percent = Math.round((done / tasks.length) * 100);
+  return {
+    percent,
+    label: `${percent}%`,
+    helper: `${done}/${tasks.length} done`,
+  };
+}
+
+function formatSyncDate(value: Date | null) {
+  if (!value) return null;
+  return value.toLocaleString("ko-KR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 export default async function Dashboard({
@@ -186,6 +205,7 @@ export default async function Dashboard({
           id: project.id,
           name: project.name,
           localPath: project.localPath,
+          lastSyncedAt: project.lastSyncedAt,
         }))}
       />
 
@@ -310,7 +330,7 @@ export default async function Dashboard({
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           {projects.map((p) => {
-            const pct = progress(p.tasks);
+            const taskProgress = projectProgress(p.tasks);
             const counts = (
               ["TODO", "IN_PROGRESS", "DONE", "BLOCKED"] as TaskStatus[]
             ).map((s) => ({
@@ -319,6 +339,7 @@ export default async function Dashboard({
               }));
             const blockedCount =
               counts.find((c) => c.s === "BLOCKED")?.n ?? 0;
+            const syncDate = formatSyncDate(p.lastSyncedAt);
             return (
               <div
                 key={p.id}
@@ -334,6 +355,11 @@ export default async function Dashboard({
                       {p.isPinned && (
                         <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-amber-600/80 text-amber-50">
                           고정
+                        </span>
+                      )}
+                      {p.localPath && (
+                        <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-cyan-700/80 text-cyan-50">
+                          Local Sync
                         </span>
                       )}
                     </div>
@@ -354,19 +380,31 @@ export default async function Dashboard({
 
                 <Link href={`/projects/${p.id}`} className="block mt-3">
                   <div className="flex justify-between text-[11px] text-slate-500 mb-1">
-                    <span>완료율 {pct}%</span>
+                    <span>완료율 {taskProgress.label}</span>
                     <span>BLOCKED {blockedCount}</span>
                   </div>
                   <div className="flex justify-between text-[11px] text-slate-500 mb-1">
                     <span>진행률</span>
-                    <span>{pct}%</span>
+                    <span>{taskProgress.helper}</span>
                   </div>
                   <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                    <div
-                      className="h-full bg-emerald-500"
-                      style={{ width: `${pct}%` }}
-                    />
+                    {taskProgress.percent === null ? (
+                      <div className="h-full w-full bg-slate-700/40" />
+                    ) : (
+                      <div
+                        className="h-full bg-emerald-500"
+                        style={{ width: `${taskProgress.percent}%` }}
+                      />
+                    )}
                   </div>
+                  <p className="mt-1 text-[10px] text-slate-600">
+                    진행률은 PromptDesk Task 기준으로 계산됩니다.
+                  </p>
+                  {p.localPath && (
+                    <p className="mt-1 text-[10px] text-cyan-300/80 truncate">
+                      Local Sync{syncDate ? ` · ${syncDate}` : " · 동기화 시각 없음"}
+                    </p>
+                  )}
                 </Link>
 
                 <Link

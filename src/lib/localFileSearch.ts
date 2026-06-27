@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import fs from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
@@ -87,6 +88,24 @@ function inferStack({
   }
   if (signals.includes("Gemfile")) stack.add("Ruby");
   return stack.size > 0 ? [...stack].join(", ") : null;
+}
+
+async function pathExists(targetPath: string) {
+  try {
+    await fs.access(/* turbopackIgnore: true */ targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function firstExistingFile(root: string, names: string[]) {
+  for (const name of names) {
+    if (await pathExists(path.join(/* turbopackIgnore: true */ root, name))) {
+      return name;
+    }
+  }
+  return null;
 }
 
 function normalizeProject(
@@ -271,9 +290,58 @@ export async function searchLocalProjectCandidates(query: string) {
   return { projects: [...matched.values()], error: null };
 }
 
+export async function detectLocalProjectFromPath(
+  localPath: string
+): Promise<LocalFileSearchProject | null> {
+  const root = path.resolve(/* turbopackIgnore: true */ localPath);
+  if (!(await pathExists(root))) return null;
+
+  const readme = await firstExistingFile(root, [
+    "README.md",
+    "README",
+    "readme.md",
+  ]);
+  const packageJson = await pathExists(
+    path.join(/* turbopackIgnore: true */ root, "package.json")
+  );
+  const git = await pathExists(
+    path.join(/* turbopackIgnore: true */ root, ".git")
+  );
+  const signalChecks = [
+    "package.json",
+    "pyproject.toml",
+    "requirements.txt",
+    "Cargo.toml",
+    "go.mod",
+    "pom.xml",
+    "build.gradle",
+    "Gemfile",
+  ];
+  const signals: string[] = [];
+  for (const signal of signalChecks) {
+    if (await pathExists(path.join(/* turbopackIgnore: true */ root, signal))) {
+      signals.push(signal);
+    }
+  }
+  if (readme && !signals.includes(readme)) signals.push(readme);
+  if (git && !signals.includes(".git")) signals.push(".git");
+
+  return {
+    name: path.basename(root),
+    localPath: root,
+    stack: inferStack({ hasPackageJson: packageJson, signals }),
+    hasReadme: Boolean(readme),
+    hasPackageJson: packageJson,
+    hasGit: git,
+    signals,
+    source: "projects",
+  };
+}
+
 export function localProjectDescription(project: LocalFileSearchProject) {
   const lines = [
     "ai-file-search Local Project",
+    `Name: ${project.name}`,
     `Path: ${project.localPath}`,
     `Stack: ${project.stack || "unknown"}`,
     `Signals: ${project.signals.length > 0 ? project.signals.join(", ") : "none"}`,

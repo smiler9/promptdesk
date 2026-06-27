@@ -20,13 +20,23 @@ type Candidate = {
   matchedFiles?: { path: string; name: string; score: number | null }[];
   registeredProjectId: string | null;
   registeredProjectName: string | null;
+  registeredProjectLastSyncedAt: string | null;
 };
 
 type ExistingProject = {
   id: string;
   name: string;
   localPath: string | null;
+  lastSyncedAt: Date | string | null;
 };
+
+function formatDate(value: Date | string | null) {
+  if (!value) return "동기화 기록 없음";
+  return new Date(value).toLocaleString("ko-KR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
 
 function CandidateFields({ candidate }: { candidate: Candidate }) {
   return (
@@ -89,6 +99,10 @@ export default function LocalProjectSync({
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
             ai-file-search JSON CLI로 로컬 개발 프로젝트를 찾아 Project에 연결합니다.
+          </p>
+          <p className="text-xs text-slate-500 mt-1">
+            진행률은 PromptDesk Task 기준으로 계산됩니다. Local Sync는 프로젝트 폴더
+            메타데이터를 연결하며, Task는 직접 생성하거나 별도 기능으로 생성해야 합니다.
           </p>
         </div>
         <button
@@ -165,10 +179,21 @@ export default function LocalProjectSync({
                           등록됨: {candidate.registeredProjectName}
                         </span>
                       )}
+                      {registered && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-700/80 text-cyan-50">
+                          업데이트 가능
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-slate-500 mt-1 break-all">
                       {candidate.localPath}
                     </div>
+                    {registered && (
+                      <div className="text-[11px] text-cyan-300/80 mt-1">
+                        마지막 동기화:{" "}
+                        {formatDate(candidate.registeredProjectLastSyncedAt)}
+                      </div>
+                    )}
                   </div>
                 </div>
 

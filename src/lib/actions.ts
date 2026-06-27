@@ -223,6 +223,7 @@ export async function importProjectFromJson(formData: FormData) {
           description: nullableStringField(projectInput.description),
           isPinned: booleanField(projectInput.isPinned),
           localPath: nullableStringField(projectInput.localPath),
+          lastSyncedAt: dateField(projectInput.lastSyncedAt),
           createdAt: dateField(projectInput.createdAt),
           updatedAt: dateField(projectInput.updatedAt),
         },

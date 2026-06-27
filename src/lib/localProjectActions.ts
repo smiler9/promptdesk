@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "./prisma";
 import {
+  detectLocalProjectFromPath,
   getLocalProjects,
   localProjectDescription,
   searchLocalProjectCandidates as searchAiFileProjects,
@@ -13,6 +14,7 @@ import {
 type LocalProjectCandidate = LocalFileSearchProject & {
   registeredProjectId: string | null;
   registeredProjectName: string | null;
+  registeredProjectLastSyncedAt: string | null;
 };
 
 function str(v: FormDataEntryValue | null): string {
@@ -64,7 +66,7 @@ async function withRegistrationState(
     paths.length > 0
       ? await prisma.project.findMany({
           where: { localPath: { in: paths } },
-          select: { id: true, name: true, localPath: true },
+          select: { id: true, name: true, localPath: true, lastSyncedAt: true },
         })
       : [];
   const existingByPath = new Map(
@@ -79,6 +81,8 @@ async function withRegistrationState(
       ...candidate,
       registeredProjectId: project?.id ?? null,
       registeredProjectName: project?.name ?? null,
+      registeredProjectLastSyncedAt:
+        project?.lastSyncedAt?.toISOString() ?? null,
     };
   });
 }
@@ -133,6 +137,7 @@ export async function createProjectFromLocalSync(formData: FormData) {
       data: {
         localPath: candidate.localPath,
         description,
+        lastSyncedAt: new Date(),
       },
     });
     revalidatePath("/");
@@ -145,6 +150,7 @@ export async function createProjectFromLocalSync(formData: FormData) {
       name: candidate.name,
       localPath: candidate.localPath,
       description,
+      lastSyncedAt: new Date(),
     },
     select: { id: true },
   });
@@ -171,6 +177,7 @@ export async function updateProjectFromLocalSync(formData: FormData) {
     data: {
       localPath: candidate.localPath,
       description: localProjectDescription(candidate),
+      lastSyncedAt: new Date(),
     },
   });
   revalidatePath("/");
@@ -186,19 +193,30 @@ export async function resyncProjectLocalMetadata(formData: FormData) {
     where: { id: projectId },
     select: { localPath: true },
   });
-  if (!project?.localPath) return;
+  if (!project?.localPath) {
+    return { error: "연결된 localPath가 없습니다." };
+  }
 
   const projects = await getLocalProjects();
-  const candidate = projects.find((item) => item.localPath === project.localPath);
-  if (!candidate) return;
+  const candidate =
+    projects.find((item) => item.localPath === project.localPath) ??
+    (await detectLocalProjectFromPath(project.localPath));
+  if (!candidate) {
+    return {
+      error:
+        "같은 localPath 프로젝트를 찾지 못했습니다. 경로가 실제로 존재하는지 확인하세요.",
+    };
+  }
 
   await prisma.project.update({
     where: { id: projectId },
     data: {
       localPath: candidate.localPath,
       description: localProjectDescription(candidate),
+      lastSyncedAt: new Date(),
     },
   });
   revalidatePath("/");
   revalidatePath(`/projects/${projectId}`);
+  return { ok: true, message: "로컬 프로젝트 메타데이터를 다시 동기화했습니다." };
 }

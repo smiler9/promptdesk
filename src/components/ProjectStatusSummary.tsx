@@ -98,7 +98,7 @@ function buildMarkdown({
   projectName,
   totalTasks,
   statusCounts,
-  completionRate,
+  completionLabel,
   promptCount,
   logCount,
   errorLogCount,
@@ -124,7 +124,7 @@ function buildMarkdown({
   projectName: string;
   totalTasks: number;
   statusCounts: Record<TaskStatus, number>;
-  completionRate: number;
+  completionLabel: string;
   promptCount: number;
   logCount: number;
   errorLogCount: number;
@@ -155,7 +155,10 @@ function buildMarkdown({
   for (const status of TASK_STATUSES) {
     lines.push(markdownLine(status, statusCounts[status]));
   }
-  lines.push(markdownLine("완료율", `${completionRate}%`));
+  lines.push(markdownLine("완료율", completionLabel));
+  lines.push(
+    "- 진행률 기준: PromptDesk Task 기준. Local Sync는 로컬 프로젝트 메타데이터만 연결합니다."
+  );
   lines.push(markdownLine("프롬프트", promptCount));
   lines.push(markdownLine("로그", logCount));
   lines.push(markdownLine("에러 로그", errorLogCount));
@@ -268,6 +271,8 @@ export default function ProjectStatusSummary({
     totalTasks === 0
       ? 0
       : Math.round((statusCounts.DONE / totalTasks) * 100);
+  const completionLabel =
+    totalTasks === 0 ? "Task 없음 (Not started)" : `${completionRate}%`;
   const promptCount = tasks.reduce((sum, task) => sum + task.prompts.length, 0);
   const logs = tasks.flatMap((task) =>
     task.logs.map((log) => ({
@@ -322,7 +327,7 @@ export default function ProjectStatusSummary({
     projectName,
     totalTasks,
     statusCounts,
-    completionRate,
+    completionLabel,
     promptCount,
     logCount,
     errorLogCount,
@@ -348,7 +353,7 @@ export default function ProjectStatusSummary({
 
   const summaryStats = [
     { label: "전체 Task", value: totalTasks },
-    { label: "완료율", value: `${completionRate}%` },
+    { label: "완료율", value: completionLabel },
     { label: "프롬프트", value: promptCount },
     { label: "로그", value: logCount },
     { label: "에러 로그", value: errorLogCount },
@@ -384,6 +389,10 @@ export default function ProjectStatusSummary({
           </h2>
           <p className="text-xs text-slate-500 mt-1">
             현재 프로젝트의 작업, 기록, 위험 신호 요약
+          </p>
+          <p className="text-xs text-slate-500 mt-1">
+            진행률은 PromptDesk Task 기준으로 계산됩니다. Task가 없으면 Local Sync가
+            완료되어도 완료율은 별도 상태로 표시됩니다.
           </p>
         </div>
         <CopyButton text={markdown} label="Markdown 복사" />
