@@ -152,7 +152,7 @@ export default function TaskList({
                   <div className="text-sm truncate">{t.title}</div>
                   {t.isPinned && (
                     <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-amber-600/80 text-amber-50">
-                      Pin
+                      고정
                     </span>
                   )}
                 </div>
@@ -172,7 +172,7 @@ export default function TaskList({
                   className="text-xs px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 text-slate-300"
                   title={t.isPinned ? "핀 해제" : "핀 고정"}
                 >
-                  {t.isPinned ? "Unpin" : "Pin"}
+                  {t.isPinned ? "해제" : "고정"}
                 </button>
               </form>
             </li>

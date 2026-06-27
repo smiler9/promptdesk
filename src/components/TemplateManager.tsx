@@ -178,7 +178,7 @@ export default function TemplateManager({
                       </span>
                       {template.isPinned && (
                         <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-600/80 text-amber-50">
-                          Pin
+                          고정
                         </span>
                       )}
                     </div>
@@ -198,7 +198,7 @@ export default function TemplateManager({
                         className="text-xs px-2 py-1 rounded border border-slate-700 hover:bg-slate-800"
                         title={template.isPinned ? "핀 해제" : "핀 고정"}
                       >
-                        {template.isPinned ? "Unpin" : "Pin"}
+                        {template.isPinned ? "해제" : "고정"}
                       </button>
                     </form>
                     <button

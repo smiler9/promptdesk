@@ -172,7 +172,7 @@ export default function TaskWorkspace({
                         ] ?? TEMPLATE_CATEGORY_META.Other;
                       return (
                         <option key={template.id} value={template.id}>
-                          {`${template.isPinned ? "[Pin] " : ""}[${
+                          {`${template.isPinned ? "[고정] " : ""}[${
                             category.label
                           }] ${template.title}`}
                         </option>

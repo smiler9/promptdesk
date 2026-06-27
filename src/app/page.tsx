@@ -181,7 +181,7 @@ export default async function Dashboard({
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-sm font-medium text-slate-300">
-              Pinned Items
+              고정 항목
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               중요한 프로젝트, 작업, 템플릿 빠른 접근
@@ -196,7 +196,7 @@ export default async function Dashboard({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <h3 className="text-[11px] uppercase tracking-wider text-slate-500 mb-2">
-                Pinned Projects
+                고정 프로젝트
               </h3>
               {pinnedProjects.length === 0 ? (
                 <p className="text-xs text-slate-600">고정된 프로젝트 없음</p>
@@ -219,7 +219,7 @@ export default async function Dashboard({
             </div>
             <div>
               <h3 className="text-[11px] uppercase tracking-wider text-slate-500 mb-2">
-                Pinned Tasks
+                고정 작업
               </h3>
               {pinnedTasks.length === 0 ? (
                 <p className="text-xs text-slate-600">고정된 작업 없음</p>
@@ -242,7 +242,7 @@ export default async function Dashboard({
             </div>
             <div>
               <h3 className="text-[11px] uppercase tracking-wider text-slate-500 mb-2">
-                Pinned Templates
+                고정 템플릿
               </h3>
               {pinnedTemplates.length === 0 ? (
                 <p className="text-xs text-slate-600">고정된 템플릿 없음</p>
@@ -305,6 +305,8 @@ export default async function Dashboard({
                 s,
                 n: p.tasks.filter((t) => t.status === s).length,
               }));
+            const blockedCount =
+              counts.find((c) => c.s === "BLOCKED")?.n ?? 0;
             return (
               <div
                 key={p.id}
@@ -319,7 +321,7 @@ export default async function Dashboard({
                       <div className="font-medium truncate">{p.name}</div>
                       {p.isPinned && (
                         <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-amber-600/80 text-amber-50">
-                          Pin
+                          고정
                         </span>
                       )}
                     </div>
@@ -333,12 +335,16 @@ export default async function Dashboard({
                       className="text-xs px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 text-slate-300"
                       title={p.isPinned ? "핀 해제" : "핀 고정"}
                     >
-                      {p.isPinned ? "Unpin" : "Pin"}
+                      {p.isPinned ? "해제" : "고정"}
                     </button>
                   </form>
                 </div>
 
                 <Link href={`/projects/${p.id}`} className="block mt-3">
+                  <div className="flex justify-between text-[11px] text-slate-500 mb-1">
+                    <span>완료율 {pct}%</span>
+                    <span>BLOCKED {blockedCount}</span>
+                  </div>
                   <div className="flex justify-between text-[11px] text-slate-500 mb-1">
                     <span>진행률</span>
                     <span>{pct}%</span>

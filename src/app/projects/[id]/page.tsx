@@ -8,6 +8,7 @@ import DecisionPanel from "@/components/DecisionPanel";
 import ProjectTimeline from "@/components/ProjectTimeline";
 import GitCommitRecords from "@/components/GitCommitRecords";
 import ProjectExport from "@/components/ProjectExport";
+import ProjectStatusSummary from "@/components/ProjectStatusSummary";
 import { TASK_STATUSES, type TaskStatus } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
@@ -186,6 +187,15 @@ export default async function ProjectPage({
           project={project}
           tasks={timelineTasks}
           decisions={project.decisions}
+          gitCommits={project.gitCommits}
+        />
+      </div>
+
+      <div className="mt-4">
+        <ProjectStatusSummary
+          projectName={project.name}
+          tasks={timelineTasks}
+          decisionCount={project.decisions.length}
           gitCommits={project.gitCommits}
         />
       </div>

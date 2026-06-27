@@ -356,7 +356,7 @@ export default async function SearchPage({
                         </span>
                         {result.isPinned && (
                           <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-amber-600/80 text-amber-50">
-                            Pin
+                            고정
                           </span>
                         )}
                         <h2 className="text-sm font-medium truncate">

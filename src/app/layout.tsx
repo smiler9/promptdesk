@@ -74,7 +74,7 @@ export default async function RootLayout({
                   <span className="truncate">{p.name}</span>
                   {p.isPinned && (
                     <span className="shrink-0 text-[10px] text-amber-300">
-                      Pin
+                      고정
                     </span>
                   )}
                 </Link>
