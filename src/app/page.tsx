@@ -1,10 +1,24 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { STATUS_META, type TaskStatus } from "@/lib/constants";
+import {
+  STATUS_META,
+  TASK_STATUSES,
+  type TaskStatus,
+} from "@/lib/constants";
 import NewProjectModal from "@/components/NewProjectModal";
 
 export const dynamic = "force-dynamic";
+
+type DashboardSearchParams = Promise<
+  Record<string, string | string[] | undefined>
+>;
+type ProjectSort = "updated" | "created";
+
+function firstParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
 
 function progress(tasks: { status: string }[]) {
   if (tasks.length === 0) return 0;
@@ -12,9 +26,40 @@ function progress(tasks: { status: string }[]) {
   return Math.round((done / tasks.length) * 100);
 }
 
-export default async function Dashboard() {
+export default async function Dashboard({
+  searchParams,
+}: {
+  searchParams: DashboardSearchParams;
+}) {
+  const params = await searchParams;
+  const query = firstParam(params.q).trim();
+  const statusParam = firstParam(params.status);
+  const projectStatus = TASK_STATUSES.includes(statusParam as TaskStatus)
+    ? (statusParam as TaskStatus)
+    : "ALL";
+  const sortParam = firstParam(params.sort);
+  const projectSort: ProjectSort =
+    sortParam === "created" ? "created" : "updated";
+
+  const projectFilters: Prisma.ProjectWhereInput[] = [];
+  if (query) {
+    projectFilters.push({
+      OR: [
+        { name: { contains: query } },
+        { description: { contains: query } },
+      ],
+    });
+  }
+  if (projectStatus !== "ALL") {
+    projectFilters.push({ tasks: { some: { status: projectStatus } } });
+  }
+
   const projects = await prisma.project.findMany({
-    orderBy: { updatedAt: "desc" },
+    where: projectFilters.length > 0 ? { AND: projectFilters } : undefined,
+    orderBy:
+      projectSort === "created"
+        ? { createdAt: "desc" }
+        : { updatedAt: "desc" },
     include: { tasks: { select: { status: true } } },
   });
 
@@ -27,6 +72,8 @@ export default async function Dashboard() {
     (a, p) => a + p.tasks.filter((t) => t.status === "BLOCKED").length,
     0
   );
+  const hasFilters =
+    query !== "" || projectStatus !== "ALL" || projectSort !== "updated";
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
@@ -49,6 +96,53 @@ export default async function Dashboard() {
         </Link>
       </div>
 
+      <form
+        action="/"
+        className="mb-6 rounded-lg border border-slate-800 bg-[#0d1320] p-4"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_160px_160px_auto] gap-2">
+          <input
+            name="q"
+            defaultValue={query}
+            placeholder="프로젝트 이름/설명 검색..."
+            className="text-sm rounded-md border border-slate-700 bg-slate-900 px-3 py-2"
+          />
+          <select
+            name="status"
+            defaultValue={projectStatus}
+            className="text-sm rounded-md border border-slate-700 bg-slate-900 px-3 py-2"
+          >
+            <option value="ALL">전체 상태</option>
+            {TASK_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {STATUS_META[s].label}
+              </option>
+            ))}
+          </select>
+          <select
+            name="sort"
+            defaultValue={projectSort}
+            className="text-sm rounded-md border border-slate-700 bg-slate-900 px-3 py-2"
+          >
+            <option value="updated">최근 수정순</option>
+            <option value="created">최근 생성순</option>
+          </select>
+          <div className="flex gap-2">
+            <button className="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium">
+              적용
+            </button>
+            {hasFilters && (
+              <Link
+                href="/"
+                className="px-3 py-2 rounded-md border border-slate-700 hover:bg-slate-800 text-sm text-slate-300"
+              >
+                초기화
+              </Link>
+            )}
+          </div>
+        </div>
+      </form>
+
       {/* 통계 */}
       <div className="grid grid-cols-4 gap-3 mb-8">
         {[
@@ -69,22 +163,24 @@ export default async function Dashboard() {
 
       {/* 프로젝트 카드 목록 */}
       <h2 className="text-sm font-medium text-slate-400 mb-3 uppercase tracking-wider">
-        프로젝트
+        프로젝트 {hasFilters && `(${projects.length})`}
       </h2>
       {projects.length === 0 ? (
         <div className="rounded-lg border border-dashed border-slate-700 p-10 text-center text-slate-500">
-          아직 프로젝트가 없습니다. 우측 상단에서 새 프로젝트를 만들어보세요.
+          {hasFilters
+            ? "조건에 맞는 프로젝트가 없습니다."
+            : "아직 프로젝트가 없습니다. 우측 상단에서 새 프로젝트를 만들어보세요."}
         </div>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           {projects.map((p) => {
             const pct = progress(p.tasks);
-            const counts = (["TODO", "IN_PROGRESS", "DONE", "BLOCKED"] as TaskStatus[]).map(
-              (s) => ({
+            const counts = (
+              ["TODO", "IN_PROGRESS", "DONE", "BLOCKED"] as TaskStatus[]
+            ).map((s) => ({
                 s,
                 n: p.tasks.filter((t) => t.status === s).length,
-              })
-            );
+              }));
             return (
               <Link
                 key={p.id}
@@ -119,9 +215,11 @@ export default async function Dashboard() {
                       >
                         {STATUS_META[c.s].label} {c.n}
                       </span>
-                    ))}
+                  ))}
                   {p.tasks.length === 0 && (
-                    <span className="text-[10px] text-slate-600">작업 없음</span>
+                    <span className="text-[10px] text-slate-600">
+                      작업 없음
+                    </span>
                   )}
                 </div>
               </Link>
