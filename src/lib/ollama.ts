@@ -1,5 +1,6 @@
 const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
 const DEFAULT_TIMEOUT_MS = 5000;
+const GENERATE_TIMEOUT_MS = 120000;
 
 export type OllamaModelDetails = {
   parent_model?: string;
@@ -31,6 +32,20 @@ export type OllamaResult<T> = {
   baseUrl: string;
   message: string;
   data: T | null;
+};
+
+export type OllamaGenerateResponse = {
+  model: string;
+  response: string;
+  created_at?: string;
+  done?: boolean;
+  done_reason?: string;
+  total_duration?: number;
+  load_duration?: number;
+  prompt_eval_count?: number;
+  prompt_eval_duration?: number;
+  eval_count?: number;
+  eval_duration?: number;
 };
 
 function ollamaBaseUrl() {
@@ -134,6 +149,109 @@ async function fetchOllamaTags(timeoutMs = DEFAULT_TIMEOUT_MS) {
   }
 }
 
+async function postOllamaGenerate({
+  model,
+  prompt,
+  timeoutMs = GENERATE_TIMEOUT_MS,
+}: {
+  model: string;
+  prompt: string;
+  timeoutMs?: number;
+}) {
+  const baseUrl = ollamaBaseUrl();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(`${baseUrl}/api/generate`, {
+      method: "POST",
+      cache: "no-store",
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        prompt,
+        stream: false,
+      }),
+    });
+
+    const text = await response.text();
+    let payload: unknown = null;
+    if (text) {
+      try {
+        payload = JSON.parse(text) as unknown;
+      } catch {
+        throw new Error("Ollama generate 응답이 올바른 JSON이 아닙니다.");
+      }
+    }
+
+    if (!response.ok) {
+      const ollamaError =
+        isRecord(payload) && typeof payload.error === "string"
+          ? payload.error
+          : `HTTP ${response.status}`;
+      throw new Error(
+        `Ollama generate 요청이 실패했습니다. ${ollamaError}`
+      );
+    }
+
+    if (!isRecord(payload) || typeof payload.response !== "string") {
+      throw new Error("Ollama generate 응답 형식이 올바르지 않습니다.");
+    }
+    if (!payload.response.trim()) {
+      throw new Error(
+        "모델이 빈 응답을 반환했습니다. qwen2.5:3b 또는 qwen2.5vl:7b 모델을 사용해보세요."
+      );
+    }
+
+    return {
+      baseUrl,
+      result: {
+        model:
+          typeof payload.model === "string"
+            ? payload.model
+            : model,
+        response: payload.response,
+        created_at:
+          typeof payload.created_at === "string"
+            ? payload.created_at
+            : undefined,
+        done: typeof payload.done === "boolean" ? payload.done : undefined,
+        done_reason:
+          typeof payload.done_reason === "string"
+            ? payload.done_reason
+            : undefined,
+        total_duration:
+          typeof payload.total_duration === "number"
+            ? payload.total_duration
+            : undefined,
+        load_duration:
+          typeof payload.load_duration === "number"
+            ? payload.load_duration
+            : undefined,
+        prompt_eval_count:
+          typeof payload.prompt_eval_count === "number"
+            ? payload.prompt_eval_count
+            : undefined,
+        prompt_eval_duration:
+          typeof payload.prompt_eval_duration === "number"
+            ? payload.prompt_eval_duration
+            : undefined,
+        eval_count:
+          typeof payload.eval_count === "number"
+            ? payload.eval_count
+            : undefined,
+        eval_duration:
+          typeof payload.eval_duration === "number"
+            ? payload.eval_duration
+            : undefined,
+      } satisfies OllamaGenerateResponse,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function getOllamaModels(): Promise<
   OllamaResult<OllamaTagsResponse>
 > {
@@ -173,6 +291,51 @@ export async function testOllamaConnection(): Promise<
           ? `Ollama 연결 성공. 사용 가능한 모델 ${models.length}개를 감지했습니다.`
           : "Ollama 연결 성공. 아직 설치된 모델은 없습니다.",
       data: { modelCount: models.length },
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      baseUrl,
+      message: errorMessage(error, baseUrl),
+      data: null,
+    };
+  }
+}
+
+export async function generateWithOllama(
+  model: string,
+  prompt: string
+): Promise<OllamaResult<OllamaGenerateResponse>> {
+  const baseUrl = ollamaBaseUrl();
+  const modelName = model.trim();
+  const promptText = prompt.trim();
+  if (!modelName) {
+    return {
+      ok: false,
+      baseUrl,
+      message: "Ollama 모델을 선택하세요.",
+      data: null,
+    };
+  }
+  if (!promptText) {
+    return {
+      ok: false,
+      baseUrl,
+      message: "실행할 프롬프트를 입력하세요.",
+      data: null,
+    };
+  }
+
+  try {
+    const { result } = await postOllamaGenerate({
+      model: modelName,
+      prompt: promptText,
+    });
+    return {
+      ok: true,
+      baseUrl,
+      message: "Ollama 응답을 생성했습니다.",
+      data: result,
     };
   } catch (error) {
     return {
