@@ -8,6 +8,7 @@ import {
   type TaskStatus,
 } from "@/lib/constants";
 import NewProjectModal from "@/components/NewProjectModal";
+import ProjectImport from "@/components/ProjectImport";
 
 export const dynamic = "force-dynamic";
 
@@ -142,6 +143,8 @@ export default async function Dashboard({
           </div>
         </div>
       </form>
+
+      <ProjectImport />
 
       {/* 통계 */}
       <div className="grid grid-cols-4 gap-3 mb-8">

@@ -23,6 +23,32 @@ function nullableStr(v: FormDataEntryValue | null): string | null {
   return str(v) || null;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringField(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function nullableStringField(value: unknown): string | null {
+  return stringField(value) || null;
+}
+
+function booleanField(value: unknown): boolean {
+  return typeof value === "boolean" ? value : false;
+}
+
+function arrayField(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+function dateField(value: unknown): Date | undefined {
+  if (typeof value !== "string") return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
 async function resolveGitCommitLinks({
   projectId,
   taskId,
@@ -104,6 +130,202 @@ export async function deleteProject(formData: FormData) {
   await prisma.project.delete({ where: { id } });
   revalidatePath("/");
   redirect("/");
+}
+
+export async function importProjectFromJson(formData: FormData) {
+  const file = formData.get("projectFile");
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "가져올 JSON 파일을 선택하세요." };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await file.text());
+  } catch {
+    return { error: "JSON 파일을 읽을 수 없습니다." };
+  }
+
+  if (!isRecord(parsed) || !isRecord(parsed.project)) {
+    return { error: "PromptDesk Export JSON 구조가 아닙니다." };
+  }
+
+  const projectInput = parsed.project;
+  const projectName = stringField(projectInput.name);
+  const taskInputs = arrayField(parsed.tasks);
+  if (!projectName || !Array.isArray(parsed.tasks)) {
+    return { error: "필수 데이터(project.name, tasks)가 없습니다." };
+  }
+
+  let importedProjectId = "";
+
+  try {
+    const importedProject = await prisma.$transaction(async (tx) => {
+      const taskIdMap = new Map<string, string>();
+      const reportIdMap = new Map<string, string>();
+      const reportTaskIdMap = new Map<string, string>();
+
+      const project = await tx.project.create({
+        data: {
+          name: `${projectName} (Imported)`,
+          description: nullableStringField(projectInput.description),
+          createdAt: dateField(projectInput.createdAt),
+          updatedAt: dateField(projectInput.updatedAt),
+        },
+        select: { id: true },
+      });
+
+      for (const decision of arrayField(parsed.decisions)) {
+        const title = stringField(decision.title);
+        if (!title) continue;
+        await tx.decision.create({
+          data: {
+            projectId: project.id,
+            title,
+            content: nullableStringField(decision.content),
+            createdAt: dateField(decision.createdAt),
+            updatedAt: dateField(decision.updatedAt),
+          },
+        });
+      }
+
+      for (const task of taskInputs) {
+        const title = stringField(task.title);
+        if (!title) throw new Error("작업 제목이 없는 항목이 있습니다.");
+
+        const status = stringField(task.status) as TaskStatus;
+        const createdTask = await tx.task.create({
+          data: {
+            projectId: project.id,
+            title,
+            description: nullableStringField(task.description),
+            status: TASK_STATUSES.includes(status) ? status : "TODO",
+            order: typeof task.order === "number" ? task.order : 0,
+            createdAt: dateField(task.createdAt),
+            updatedAt: dateField(task.updatedAt),
+          },
+          select: { id: true },
+        });
+
+        const oldTaskId = stringField(task.id);
+        if (oldTaskId) taskIdMap.set(oldTaskId, createdTask.id);
+
+        for (const prompt of arrayField(task.prompts)) {
+          const content = stringField(prompt.content);
+          if (!content) continue;
+          const targetAI = stringField(prompt.targetAI) as TargetAI;
+          await tx.prompt.create({
+            data: {
+              taskId: createdTask.id,
+              content,
+              targetAI: TARGET_AIS.includes(targetAI) ? targetAI : "Claude",
+              isGenerated: booleanField(prompt.isGenerated),
+              createdAt: dateField(prompt.createdAt),
+              updatedAt: dateField(prompt.updatedAt),
+            },
+          });
+        }
+
+        for (const log of arrayField(task.logs)) {
+          const content = stringField(log.content);
+          if (!content) continue;
+          const type = stringField(log.type) as LogType;
+          await tx.logEntry.create({
+            data: {
+              taskId: createdTask.id,
+              content,
+              type: LOG_TYPES.includes(type) ? type : "NOTE",
+              createdAt: dateField(log.createdAt),
+              updatedAt: dateField(log.updatedAt),
+            },
+          });
+        }
+
+        for (const report of arrayField(task.reports)) {
+          const summary = stringField(report.summary);
+          if (!summary) continue;
+          const createdReport = await tx.taskExecutionReport.create({
+            data: {
+              taskId: createdTask.id,
+              summary,
+              changedFiles: nullableStringField(report.changedFiles),
+              commandsRun: nullableStringField(report.commandsRun),
+              testResults: nullableStringField(report.testResults),
+              buildResult: nullableStringField(report.buildResult),
+              commitHash: nullableStringField(report.commitHash),
+              pushedToRemote: booleanField(report.pushedToRemote),
+              nextSteps: nullableStringField(report.nextSteps),
+              createdAt: dateField(report.createdAt),
+              updatedAt: dateField(report.updatedAt),
+            },
+            select: { id: true },
+          });
+
+          const oldReportId = stringField(report.id);
+          if (oldReportId) {
+            reportIdMap.set(oldReportId, createdReport.id);
+            reportTaskIdMap.set(oldReportId, createdTask.id);
+          }
+        }
+      }
+
+      const commitInputs = new Map<string, Record<string, unknown>>();
+      for (const commit of arrayField(parsed.gitCommits)) {
+        const key = stringField(commit.id) || stringField(commit.commitHash);
+        if (key) commitInputs.set(key, commit);
+      }
+      for (const task of taskInputs) {
+        for (const commit of arrayField(task.gitCommits)) {
+          const key = stringField(commit.id) || stringField(commit.commitHash);
+          if (key && !commitInputs.has(key)) commitInputs.set(key, commit);
+        }
+      }
+
+      for (const commit of commitInputs.values()) {
+        const commitHash = stringField(commit.commitHash);
+        const commitMessage = stringField(commit.commitMessage);
+        if (!commitHash || !commitMessage) continue;
+
+        const oldReportId = stringField(commit.reportId);
+        const mappedReportId = oldReportId
+          ? reportIdMap.get(oldReportId) ?? null
+          : null;
+        const oldTaskId = stringField(commit.taskId);
+        const mappedTaskId =
+          (oldTaskId ? taskIdMap.get(oldTaskId) : null) ??
+          (oldReportId ? reportTaskIdMap.get(oldReportId) : null) ??
+          null;
+
+        await tx.gitCommitRecord.create({
+          data: {
+            projectId: project.id,
+            taskId: mappedTaskId,
+            reportId: mappedReportId,
+            commitHash,
+            commitMessage,
+            branchName: stringField(commit.branchName) || "main",
+            remoteUrl: nullableStringField(commit.remoteUrl),
+            pushedToRemote: booleanField(commit.pushedToRemote),
+            createdAt: dateField(commit.createdAt),
+            updatedAt: dateField(commit.updatedAt),
+          },
+        });
+      }
+
+      return project;
+    });
+
+    importedProjectId = importedProject.id;
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "프로젝트를 가져오는 중 오류가 발생했습니다.",
+    };
+  }
+
+  revalidatePath("/");
+  redirect(`/projects/${importedProjectId}`);
 }
 
 /* ---------- Task ---------- */
