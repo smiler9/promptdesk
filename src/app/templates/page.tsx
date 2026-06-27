@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export default async function TemplatesPage() {
   const templates = await prisma.promptTemplate.findMany({
-    orderBy: { updatedAt: "desc" },
+    orderBy: [{ isPinned: "desc" }, { updatedAt: "desc" }],
   });
 
   return (

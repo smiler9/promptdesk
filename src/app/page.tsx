@@ -7,6 +7,7 @@ import {
   TASK_STATUSES,
   type TaskStatus,
 } from "@/lib/constants";
+import { toggleProjectPin } from "@/lib/actions";
 import NewProjectModal from "@/components/NewProjectModal";
 import ProjectImport from "@/components/ProjectImport";
 
@@ -55,14 +56,40 @@ export default async function Dashboard({
     projectFilters.push({ tasks: { some: { status: projectStatus } } });
   }
 
-  const projects = await prisma.project.findMany({
-    where: projectFilters.length > 0 ? { AND: projectFilters } : undefined,
-    orderBy:
-      projectSort === "created"
-        ? { createdAt: "desc" }
-        : { updatedAt: "desc" },
-    include: { tasks: { select: { status: true } } },
-  });
+  const [projects, pinnedProjects, pinnedTasks, pinnedTemplates] =
+    await Promise.all([
+      prisma.project.findMany({
+        where: projectFilters.length > 0 ? { AND: projectFilters } : undefined,
+        orderBy:
+          projectSort === "created"
+            ? [{ isPinned: "desc" }, { createdAt: "desc" }]
+            : [{ isPinned: "desc" }, { updatedAt: "desc" }],
+        include: { tasks: { select: { status: true } } },
+      }),
+      prisma.project.findMany({
+        where: { isPinned: true },
+        orderBy: { updatedAt: "desc" },
+        take: 6,
+        select: { id: true, name: true, description: true },
+      }),
+      prisma.task.findMany({
+        where: { isPinned: true },
+        orderBy: { updatedAt: "desc" },
+        take: 6,
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          project: { select: { name: true } },
+        },
+      }),
+      prisma.promptTemplate.findMany({
+        where: { isPinned: true },
+        orderBy: { updatedAt: "desc" },
+        take: 6,
+        select: { id: true, title: true, targetAI: true, category: true },
+      }),
+    ]);
 
   const totalTasks = projects.reduce((a, p) => a + p.tasks.length, 0);
   const activeTasks = projects.reduce(
@@ -75,6 +102,10 @@ export default async function Dashboard({
   );
   const hasFilters =
     query !== "" || projectStatus !== "ALL" || projectSort !== "updated";
+  const hasPinnedItems =
+    pinnedProjects.length > 0 ||
+    pinnedTasks.length > 0 ||
+    pinnedTemplates.length > 0;
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
@@ -146,6 +177,96 @@ export default async function Dashboard({
 
       <ProjectImport />
 
+      <section className="mb-8 rounded-lg border border-slate-800 bg-[#0d1320] p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-sm font-medium text-slate-300">
+              Pinned Items
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              중요한 프로젝트, 작업, 템플릿 빠른 접근
+            </p>
+          </div>
+        </div>
+        {!hasPinnedItems ? (
+          <p className="text-xs text-slate-600">
+            아직 고정된 항목이 없습니다.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <h3 className="text-[11px] uppercase tracking-wider text-slate-500 mb-2">
+                Pinned Projects
+              </h3>
+              {pinnedProjects.length === 0 ? (
+                <p className="text-xs text-slate-600">고정된 프로젝트 없음</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {pinnedProjects.map((project) => (
+                    <Link
+                      key={project.id}
+                      href={`/projects/${project.id}`}
+                      className="block rounded-md border border-slate-800 px-3 py-2 hover:border-indigo-600/60"
+                    >
+                      <div className="text-sm truncate">{project.name}</div>
+                      <div className="text-xs text-slate-500 truncate mt-0.5">
+                        {project.description || "설명 없음"}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <h3 className="text-[11px] uppercase tracking-wider text-slate-500 mb-2">
+                Pinned Tasks
+              </h3>
+              {pinnedTasks.length === 0 ? (
+                <p className="text-xs text-slate-600">고정된 작업 없음</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {pinnedTasks.map((task) => (
+                    <Link
+                      key={task.id}
+                      href={`/tasks/${task.id}`}
+                      className="block rounded-md border border-slate-800 px-3 py-2 hover:border-indigo-600/60"
+                    >
+                      <div className="text-sm truncate">{task.title}</div>
+                      <div className="text-xs text-slate-500 truncate mt-0.5">
+                        {task.project.name} · {task.status}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <h3 className="text-[11px] uppercase tracking-wider text-slate-500 mb-2">
+                Pinned Templates
+              </h3>
+              {pinnedTemplates.length === 0 ? (
+                <p className="text-xs text-slate-600">고정된 템플릿 없음</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {pinnedTemplates.map((template) => (
+                    <Link
+                      key={template.id}
+                      href="/templates"
+                      className="block rounded-md border border-slate-800 px-3 py-2 hover:border-indigo-600/60"
+                    >
+                      <div className="text-sm truncate">{template.title}</div>
+                      <div className="text-xs text-slate-500 truncate mt-0.5">
+                        {template.targetAI} · {template.category}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
       {/* 통계 */}
       <div className="grid grid-cols-4 gap-3 mb-8">
         {[
@@ -185,17 +306,39 @@ export default async function Dashboard({
                 n: p.tasks.filter((t) => t.status === s).length,
               }));
             return (
-              <Link
+              <div
                 key={p.id}
-                href={`/projects/${p.id}`}
                 className="rounded-xl border border-slate-800 bg-[#0d1320] p-4 hover:border-indigo-600/60 transition-colors"
               >
-                <div className="font-medium truncate">{p.name}</div>
-                <div className="text-xs text-slate-500 mt-1 line-clamp-2 min-h-[2rem]">
-                  {p.description || "설명 없음"}
+                <div className="flex items-start justify-between gap-3">
+                  <Link
+                    href={`/projects/${p.id}`}
+                    className="min-w-0 flex-1 hover:text-indigo-300"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="font-medium truncate">{p.name}</div>
+                      {p.isPinned && (
+                        <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-amber-600/80 text-amber-50">
+                          Pin
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1 line-clamp-2 min-h-[2rem]">
+                      {p.description || "설명 없음"}
+                    </div>
+                  </Link>
+                  <form action={toggleProjectPin} className="shrink-0">
+                    <input type="hidden" name="id" value={p.id} />
+                    <button
+                      className="text-xs px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 text-slate-300"
+                      title={p.isPinned ? "핀 해제" : "핀 고정"}
+                    >
+                      {p.isPinned ? "Unpin" : "Pin"}
+                    </button>
+                  </form>
                 </div>
 
-                <div className="mt-3">
+                <Link href={`/projects/${p.id}`} className="block mt-3">
                   <div className="flex justify-between text-[11px] text-slate-500 mb-1">
                     <span>진행률</span>
                     <span>{pct}%</span>
@@ -206,9 +349,12 @@ export default async function Dashboard({
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                </div>
+                </Link>
 
-                <div className="flex gap-1.5 mt-3 flex-wrap">
+                <Link
+                  href={`/projects/${p.id}`}
+                  className="flex gap-1.5 mt-3 flex-wrap"
+                >
                   {counts
                     .filter((c) => c.n > 0)
                     .map((c) => (
@@ -224,8 +370,8 @@ export default async function Dashboard({
                       작업 없음
                     </span>
                   )}
-                </div>
-              </Link>
+                </Link>
+              </div>
             );
           })}
         </div>

@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { createTask, updateTaskStatus } from "@/lib/actions";
+import { createTask, toggleTaskPin, updateTaskStatus } from "@/lib/actions";
 import { STATUS_META, TASK_STATUSES, type TaskStatus } from "@/lib/constants";
 
 type Task = {
   id: string;
   title: string;
   description: string | null;
+  isPinned: boolean;
   status: string;
   _count: { prompts: number; logs: number };
 };
@@ -147,7 +148,14 @@ export default function TaskList({
                 href={`/tasks/${t.id}`}
                 className="flex-1 min-w-0 hover:text-indigo-300"
               >
-                <div className="text-sm truncate">{t.title}</div>
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="text-sm truncate">{t.title}</div>
+                  {t.isPinned && (
+                    <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-amber-600/80 text-amber-50">
+                      Pin
+                    </span>
+                  )}
+                </div>
                 {t.description && (
                   <div className="text-xs text-slate-500 truncate mt-0.5">
                     {t.description}
@@ -158,6 +166,15 @@ export default function TaskList({
               <span className="text-[11px] text-slate-500 shrink-0">
                 프롬프트 {t._count.prompts} · 로그 {t._count.logs}
               </span>
+              <form action={toggleTaskPin} className="shrink-0">
+                <input type="hidden" name="id" value={t.id} />
+                <button
+                  className="text-xs px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 text-slate-300"
+                  title={t.isPinned ? "핀 해제" : "핀 고정"}
+                >
+                  {t.isPinned ? "Unpin" : "Pin"}
+                </button>
+              </form>
             </li>
           ))}
         </ul>

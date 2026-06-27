@@ -8,6 +8,7 @@ type ExportProject = {
   id: string;
   name: string;
   description: string | null;
+  isPinned?: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
@@ -73,6 +74,7 @@ type ExportTask = {
   projectId: string;
   title: string;
   description: string | null;
+  isPinned?: boolean;
   status: string;
   order: number;
   createdAt: Timestamp;
@@ -299,6 +301,7 @@ function buildMarkdownExport({
   lines.push(`- Project ID: ${project.id}`);
   lines.push(`- Created: ${formatDate(project.createdAt)}`);
   lines.push(`- Updated: ${formatDate(project.updatedAt)}`);
+  lines.push(`- Pinned: ${project.isPinned ? "yes" : "no"}`);
   lines.push(`- Description: ${project.description || "없음"}`);
   lines.push("");
 
@@ -329,6 +332,7 @@ function buildMarkdownExport({
       lines.push(`- Status: ${status?.label ?? task.status}`);
       lines.push(`- Created: ${formatDate(task.createdAt)}`);
       lines.push(`- Updated: ${formatDate(task.updatedAt)}`);
+      lines.push(`- Pinned: ${task.isPinned ? "yes" : "no"}`);
       lines.push(`- Description: ${task.description || "없음"}`);
       lines.push("");
 

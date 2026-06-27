@@ -79,10 +79,10 @@ export default async function ProjectPage({
           where: taskFilters.length > 0 ? { AND: taskFilters } : undefined,
           orderBy:
             taskSort === "updated"
-              ? { updatedAt: "desc" }
+              ? [{ isPinned: "desc" }, { updatedAt: "desc" }]
               : taskSort === "created"
-                  ? { createdAt: "desc" }
-                  : { order: "asc" },
+                  ? [{ isPinned: "desc" }, { createdAt: "desc" }]
+                  : [{ isPinned: "desc" }, { order: "asc" }],
           include: { _count: { select: { prompts: true, logs: true } } },
         },
       },
@@ -95,6 +95,7 @@ export default async function ProjectPage({
         projectId: true,
         title: true,
         description: true,
+        isPinned: true,
         status: true,
         order: true,
         createdAt: true,

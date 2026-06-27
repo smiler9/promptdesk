@@ -35,6 +35,7 @@ type PromptTemplate = {
   id: string;
   title: string;
   description: string | null;
+  isPinned: boolean;
   targetAI: string;
   category: string;
   content: string;
@@ -171,7 +172,9 @@ export default function TaskWorkspace({
                         ] ?? TEMPLATE_CATEGORY_META.Other;
                       return (
                         <option key={template.id} value={template.id}>
-                          [{category.label}] {template.title}
+                          {`${template.isPinned ? "[Pin] " : ""}[${
+                            category.label
+                          }] ${template.title}`}
                         </option>
                       );
                     })}

@@ -103,6 +103,11 @@ function revalidateGitCommitPaths({
   }
 }
 
+function revalidatePinnedPaths() {
+  revalidatePath("/");
+  revalidatePath("/search");
+}
+
 /* ---------- Project ---------- */
 
 export async function createProject(formData: FormData) {
@@ -121,6 +126,22 @@ export async function updateProject(formData: FormData) {
   const description = str(formData.get("description")) || null;
   await prisma.project.update({ where: { id }, data: { name, description } });
   revalidatePath("/");
+  revalidatePath(`/projects/${id}`);
+}
+
+export async function toggleProjectPin(formData: FormData) {
+  const id = str(formData.get("id"));
+  if (!id) return;
+  const project = await prisma.project.findUnique({
+    where: { id },
+    select: { isPinned: true },
+  });
+  if (!project) return;
+  await prisma.project.update({
+    where: { id },
+    data: { isPinned: !project.isPinned },
+  });
+  revalidatePinnedPaths();
   revalidatePath(`/projects/${id}`);
 }
 
@@ -168,6 +189,7 @@ export async function importProjectFromJson(formData: FormData) {
         data: {
           name: `${projectName} (Imported)`,
           description: nullableStringField(projectInput.description),
+          isPinned: booleanField(projectInput.isPinned),
           createdAt: dateField(projectInput.createdAt),
           updatedAt: dateField(projectInput.updatedAt),
         },
@@ -198,6 +220,7 @@ export async function importProjectFromJson(formData: FormData) {
             projectId: project.id,
             title,
             description: nullableStringField(task.description),
+            isPinned: booleanField(task.isPinned),
             status: TASK_STATUSES.includes(status) ? status : "TODO",
             order: typeof task.order === "number" ? task.order : 0,
             createdAt: dateField(task.createdAt),
@@ -355,6 +378,23 @@ export async function updateTaskStatus(formData: FormData) {
   revalidatePath("/");
 }
 
+export async function toggleTaskPin(formData: FormData) {
+  const id = str(formData.get("id"));
+  if (!id) return;
+  const task = await prisma.task.findUnique({
+    where: { id },
+    select: { projectId: true, isPinned: true },
+  });
+  if (!task) return;
+  await prisma.task.update({
+    where: { id },
+    data: { isPinned: !task.isPinned },
+  });
+  revalidatePinnedPaths();
+  revalidatePath(`/projects/${task.projectId}`);
+  revalidatePath(`/tasks/${id}`);
+}
+
 export async function updateTask(formData: FormData) {
   const id = str(formData.get("id"));
   const title = str(formData.get("title"));
@@ -462,6 +502,22 @@ export async function updatePromptTemplate(formData: FormData) {
       content,
     },
   });
+  revalidatePath("/templates");
+}
+
+export async function togglePromptTemplatePin(formData: FormData) {
+  const id = str(formData.get("id"));
+  if (!id) return;
+  const template = await prisma.promptTemplate.findUnique({
+    where: { id },
+    select: { isPinned: true },
+  });
+  if (!template) return;
+  await prisma.promptTemplate.update({
+    where: { id },
+    data: { isPinned: !template.isPinned },
+  });
+  revalidatePinnedPaths();
   revalidatePath("/templates");
 }
 

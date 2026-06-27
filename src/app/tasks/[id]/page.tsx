@@ -32,7 +32,7 @@ export default async function TaskPage({
       },
     }),
     prisma.promptTemplate.findMany({
-      orderBy: [{ category: "asc" }, { title: "asc" }],
+      orderBy: [{ isPinned: "desc" }, { category: "asc" }, { title: "asc" }],
     }),
   ]);
 

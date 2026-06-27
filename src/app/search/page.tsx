@@ -13,6 +13,7 @@ type SearchResult = {
   summary: string;
   projectName?: string;
   taskName?: string;
+  isPinned?: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -171,6 +172,7 @@ async function runGlobalSearch(query: string) {
       title: project.name,
       summary: excerpt(project.description) || "프로젝트",
       projectName: project.name,
+      isPinned: project.isPinned,
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
     })),
@@ -182,6 +184,7 @@ async function runGlobalSearch(query: string) {
       summary: excerpt(task.description) || `상태: ${task.status}`,
       projectName: task.project.name,
       taskName: task.title,
+      isPinned: task.isPinned,
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
     })),
@@ -351,6 +354,11 @@ export default async function SearchPage({
                         >
                           {meta.label}
                         </span>
+                        {result.isPinned && (
+                          <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-amber-600/80 text-amber-50">
+                            Pin
+                          </span>
+                        )}
                         <h2 className="text-sm font-medium truncate">
                           {result.title}
                         </h2>

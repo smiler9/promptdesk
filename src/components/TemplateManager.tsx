@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   createPromptTemplate,
   deletePromptTemplate,
+  togglePromptTemplatePin,
   updatePromptTemplate,
 } from "@/lib/actions";
 import {
@@ -17,6 +18,7 @@ type PromptTemplate = {
   id: string;
   title: string;
   description: string | null;
+  isPinned: boolean;
   targetAI: string;
   category: string;
   content: string;
@@ -174,6 +176,11 @@ export default function TemplateManager({
                       <span className="text-[11px] px-1.5 py-0.5 rounded bg-indigo-600/80 text-indigo-50">
                         {template.targetAI}
                       </span>
+                      {template.isPinned && (
+                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-600/80 text-amber-50">
+                          Pin
+                        </span>
+                      )}
                     </div>
                     {template.description && (
                       <p className="text-xs text-slate-500 mt-1">
@@ -185,6 +192,15 @@ export default function TemplateManager({
                     </p>
                   </div>
                   <div className="flex gap-1.5 shrink-0">
+                    <form action={togglePromptTemplatePin}>
+                      <input type="hidden" name="id" value={template.id} />
+                      <button
+                        className="text-xs px-2 py-1 rounded border border-slate-700 hover:bg-slate-800"
+                        title={template.isPinned ? "핀 해제" : "핀 고정"}
+                      >
+                        {template.isPinned ? "Unpin" : "Pin"}
+                      </button>
+                    </form>
                     <button
                       onClick={() => {
                         setEditingId((id) =>

@@ -14,8 +14,8 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const projects = await prisma.project.findMany({
-    orderBy: { updatedAt: "desc" },
-    select: { id: true, name: true },
+    orderBy: [{ isPinned: "desc" }, { updatedAt: "desc" }],
+    select: { id: true, name: true, isPinned: true },
     take: 30,
   });
 
@@ -69,9 +69,14 @@ export default async function RootLayout({
                 <Link
                   key={p.id}
                   href={`/projects/${p.id}`}
-                  className="block px-3 py-1.5 rounded-md text-sm text-slate-300 hover:bg-slate-800/60 truncate"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm text-slate-300 hover:bg-slate-800/60"
                 >
-                  {p.name}
+                  <span className="truncate">{p.name}</span>
+                  {p.isPinned && (
+                    <span className="shrink-0 text-[10px] text-amber-300">
+                      Pin
+                    </span>
+                  )}
                 </Link>
               ))}
             </div>
