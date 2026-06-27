@@ -9,6 +9,7 @@ import ProjectTimeline from "@/components/ProjectTimeline";
 import GitCommitRecords from "@/components/GitCommitRecords";
 import ProjectExport from "@/components/ProjectExport";
 import ProjectStatusSummary from "@/components/ProjectStatusSummary";
+import ProjectLocalSyncInfo from "@/components/ProjectLocalSyncInfo";
 import {
   TASK_PRIORITIES,
   TASK_STATUSES,
@@ -222,6 +223,10 @@ export default async function ProjectPage({
           name={project.name}
           description={project.description}
         />
+      </div>
+
+      <div className="mt-4">
+        <ProjectLocalSyncInfo project={project} />
       </div>
 
       <div className="mt-4">

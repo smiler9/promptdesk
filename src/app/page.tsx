@@ -10,6 +10,7 @@ import {
 import { toggleProjectPin } from "@/lib/actions";
 import NewProjectModal from "@/components/NewProjectModal";
 import ProjectImport from "@/components/ProjectImport";
+import LocalProjectSync from "@/components/LocalProjectSync";
 
 export const dynamic = "force-dynamic";
 
@@ -176,6 +177,14 @@ export default async function Dashboard({
       </form>
 
       <ProjectImport />
+
+      <LocalProjectSync
+        projects={projects.map((project) => ({
+          id: project.id,
+          name: project.name,
+          localPath: project.localPath,
+        }))}
+      />
 
       <section className="mb-8 rounded-lg border border-slate-800 bg-[#0d1320] p-4">
         <div className="flex items-center justify-between mb-3">

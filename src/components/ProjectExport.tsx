@@ -16,6 +16,7 @@ type ExportProject = {
   name: string;
   description: string | null;
   isPinned?: boolean;
+  localPath?: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };
@@ -266,7 +267,11 @@ function buildJsonExport({
   return {
     exportedAt: new Date().toISOString(),
     project: {
-      ...project,
+      id: project.id,
+      name: project.name,
+      description: project.description,
+      isPinned: project.isPinned ?? false,
+      localPath: project.localPath ?? null,
       createdAt: toIso(project.createdAt),
       updatedAt: toIso(project.updatedAt),
     },
@@ -341,6 +346,15 @@ function buildMarkdownExport({
   lines.push(`- Updated: ${formatDate(project.updatedAt)}`);
   lines.push(`- Pinned: ${project.isPinned ? "yes" : "no"}`);
   lines.push(`- Description: ${project.description || "없음"}`);
+  lines.push("");
+
+  lines.push("## Local Sync");
+  lines.push("");
+  if (!project.localPath) {
+    lines.push("_연결된 로컬 프로젝트 경로가 없습니다._");
+  } else {
+    lines.push(`- Local Path: ${project.localPath}`);
+  }
   lines.push("");
 
   lines.push("## Decisions");
